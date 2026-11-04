@@ -38,6 +38,6 @@ export async function exportBackup() {
 export async function readBackup(file: File): Promise<Backup> {
   let d: Partial<Backup> & { app?: string };
   try { d = JSON.parse(await file.text()); } catch { throw new Error("Fichier illisible. Choisis un export des Piliers."); }
-  if (!d || (d.app !== "les-piliers" && d.app !== "quatre-piliers") || !d.state || d.state.v !== 1) throw new Error("Ce fichier n'est pas une sauvegarde des Piliers.");
+  if (!d || (d.app !== "les-piliers" && d.app !== "quatre-piliers") || !d.state || ![1, 2].includes((d.state as { v?: number }).v ?? 0)) throw new Error("Ce fichier n'est pas une sauvegarde des Piliers.");
   return { ...(d as Backup), state: normalize(d.state) };
 }

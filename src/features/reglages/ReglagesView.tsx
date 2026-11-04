@@ -48,6 +48,13 @@ export function ReglagesView() {
       <div className="phead"><span className="rom" aria-hidden="true">Ø</span><div className="t"><span className="eyebrow">Réglages</span><h1>Atelier</h1></div><div /></div>
       {demo && <div className="band"><p>Tu es en démo. Les réglages de l'IA s'appliquent à ton vrai chantier.</p></div>}
 
+      {c && (
+        <Card title="Profil" aside={c.profile?.updated ? `mis à jour le ${fdate(c.profile.updated)}` : "à remplir"}>
+          <p className="muted small">Objectifs, niveau, matériel, compétences, domaines : tout ce que le Contremaître sait de toi et dont il se sert pour construire tes séances, tes missions et tes sujets.</p>
+          <div><button className="btn" type="button" onClick={() => nav("/profil")}>Modifier mon profil</button></div>
+        </Card>
+      )}
+
       <Card title="Contremaître IA" aside={<span className={"pill " + (aiEnabled(settings) ? "on" : "")}>{aiEnabled(settings) ? "Branché" : "Débranché"}</span>}>
         <label className="f" htmlFor="s-key">Clé API DeepSeek
           <input type="password" id="s-key" autoComplete="off" spellCheck={false} placeholder="sk-…" value={key} onChange={(e) => setKey(e.target.value)} />

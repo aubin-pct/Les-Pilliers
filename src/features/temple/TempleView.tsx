@@ -13,6 +13,8 @@ import { Card, Foreman, Thinking, useNow } from "@/ui/kit";
 import { TempleSvg } from "./TempleSvg";
 import { Dossier, ExcuseBars, HistChart } from "./Charts";
 import { AccountSheet } from "./AccountSheet";
+import { MemoryCard } from "./Memory";
+import { profileGaps } from "@/content/profile";
 
 export function TempleView() {
   const c = useChantier()!;
@@ -37,6 +39,7 @@ export function TempleView() {
     { ok: c.esprit.length > 0, t: "Première explication à l'Examinateur", to: "/esprit" },
     { ok: c.missionLog.length > 0 || c.missions.length > 0, t: "Première action de mission", to: "/capital" },
     { ok: aiEnabled(settings), t: "Brancher le Contremaître IA (clé DeepSeek)", to: "/reglages" },
+    { ok: profileGaps(c.profile).length === 0, t: "Compléter ton profil (" + (profileGaps(c.profile).join(", ") || "ok") + ")", to: "/profil" },
   ];
 
   const runReport = async () => {
@@ -124,6 +127,8 @@ export function TempleView() {
         <div className="stat"><span className="k num">{streak(c, now)}</span><span className="l">jours complets d'affilée</span></div>
         <div className="stat"><span className="k num" style={{ color: monthEx ? "var(--blood)" : undefined }}>{monthEx}</span><span className="l">excuses en 30 jours</span></div>
       </div>
+
+      <MemoryCard c={c} />
 
       <Card title="Courbe du chantier" aside={`${c.hist.length} ${plural(c.hist.length, "jour")}`}><HistChart c={c} now={now} /></Card>
 

@@ -72,6 +72,7 @@ export function weekData(c: Chantier, now: number) {
     explications: c.esprit.filter((e) => e.ts > since).map((e) => ({ sujet: e.topic, note: e.note })),
     oraux: c.orals.filter((o) => o.ts > since).map((o) => ({ mots_min: o.wpm, tics_min: o.tpm, blancs_min: o.ppm })),
     victoires: c.wins.filter((w) => w.ts > since).map((w) => w.text),
+    memoire_du_contremaitre: Object.fromEntries(Object.entries(c.memoire).map(([k, m]) => [k, m && { priorite: m.priorite, faiblesses: m.faiblesses }])),
   };
 }
 

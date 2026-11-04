@@ -72,11 +72,39 @@ export function missionPoints(level: number, amount: number, custom: boolean) {
   return (custom ? POINTS.customMission : POINTS.missionBase * (level + 1)) + (amount > 0 ? 6 * Math.log2(1 + amount / 10) : 0);
 }
 
-export function currentMission(c: Chantier) {
-  if (c.custom) return { title: c.custom.titre, detail: c.custom.consigne, proof: c.custom.preuve, custom: true, cash: true, done: false };
+export interface CurrentMission {
+  title: string; detail: string; proof: string; cash: boolean; jours: number;
+  /** Rang dans la feuille de route (0 = premier palier). */
+  index: number; total: number;
+  custom: boolean; done: boolean; fromRoadmap: boolean;
+}
+
+/** Mission en cours : palier de la feuille de route personnelle, sinon échelle de départ (`LADDER`). */
+export function currentMission(c: Chantier): CurrentMission {
+  if (c.custom) return { title: c.custom.titre, detail: c.custom.consigne, proof: c.custom.preuve, cash: true, jours: c.custom.jours, index: 0, total: 1, custom: true, done: false, fromRoadmap: false };
+  if (c.roadmap) {
+    const r = c.roadmap, done = r.index >= r.paliers.length;
+    const P = r.paliers[Math.min(r.index, r.paliers.length - 1)];
+    return { title: P.titre, detail: P.pourquoi, proof: P.preuve, cash: P.cash, jours: P.jours, index: r.index, total: r.paliers.length, custom: false, done, fromRoadmap: true };
+  }
   const done = c.missionLevel >= LADDER.length;
   const L = LADDER[Math.min(c.missionLevel, LADDER.length - 1)];
-  return { title: L.title, detail: L.detail, proof: "Ce que tu as fait + montant encaissé", custom: false, cash: L.cash, done };
+  return { title: L.title, detail: L.detail, proof: "Ce que tu as fait + montant encaissé", cash: L.cash, jours: 14, index: c.missionLevel, total: LADDER.length, custom: false, done, fromRoadmap: false };
+}
+
+/** Passe au palier suivant après une livraison. */
+export function advanceMission(c: Chantier) {
+  if (c.custom) { c.custom = null; return; }
+  if (c.roadmap) c.roadmap.index = Math.min(c.roadmap.paliers.length, c.roadmap.index + 1);
+  else c.missionLevel = Math.min(LADDER.length, c.missionLevel + 1);
+  c.missionSteps = null;
+}
+
+/** Séance planifiée : séries faites / prévues. */
+export function setsRatio(logs: { faits: (number | null)[] }[]) {
+  const total = logs.reduce((a, l) => a + l.faits.length, 0);
+  const done = logs.reduce((a, l) => a + l.faits.filter((x) => x !== null && x > 0).length, 0);
+  return { done, total };
 }
 
 /** Révision : réussie (≥ 6/10) → étape suivante ; ratée → retour demain. */

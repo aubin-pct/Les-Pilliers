@@ -32,8 +32,6 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
     const P = PILLAR[p.pillar];
     const ai = await judgeExcuse({
       pilier: P.name, sub: P.sub, date: fdateK(p.date), floor: P.floor, excuse: t,
-      registre: c.excuses.filter((e) => e.ts > now - 30 * DAY).map((e) => ({ date: e.date, pilier: PILLAR[e.pillar].name, excuse: e.text, categorie: e.cat })),
-      victoires: c.wins.slice(-5).map((w) => ({ date: fdate(w.ts), victoire: w.text })),
     });
     const v = ai
       ? { cat: (ai.categorie in CAT_NAMES ? ai.categorie : "autre") as ExcuseCat, ok: !!ai.recevable, verdict: ai.verdict }

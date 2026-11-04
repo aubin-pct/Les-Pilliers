@@ -16,11 +16,82 @@ export type ExcuseCat = "fatigue" | "temps" | "motivation" | "externe" | "sante"
 
 export interface Excuse { ts: number; date: string; pillar: PillarId; text: string; cat: ExcuseCat; ok: boolean; verdict: string }
 
-export interface Seance { ts: number; type: string; dur: number; done: number; total: number; proof: string; timed: boolean }
+export interface Seance {
+  ts: number; type: string; dur: number;
+  /** Séries faites / séries prévues (anciennes séances : exercices cochés). */
+  done: number; total: number;
+  proof: string; timed: boolean;
+  /** Ressenti de l'effort, 1 à 10. */
+  rpe?: number;
+  note?: string;
+  /** Détail série par série : ce qui était prévu et ce qui a été fait. */
+  logs?: SetLog[];
+}
+
+export interface SetLog { exo: string; type: "reps" | "duree"; cible: number; faits: (number | null)[]; charge?: string }
 
 export interface TestRecord { ts: number; kind: TestId; value: number; counted: boolean }
 
 export interface Mission { ts: number; level: number; title: string; proof: string; amount: number; photo: string | null }
+
+/* ---------- Profil : ce que l'utilisateur déclare de lui ---------- */
+
+export type Level = "debutant" | "intermediaire" | "avance";
+export type CorpsGoal = "masse" | "force" | "endurance" | "seche" | "souplesse" | "sante";
+
+export interface Profile {
+  prenom: string;
+  corps: {
+    objectifs: CorpsGoal[]; niveau: Level;
+    age: number | null; poids: number | null; taille: number | null;
+    materiel: string[]; seancesParSemaine: number; minutes: number;
+    contraintes: string; activites: string;
+  };
+  capital: {
+    situation: string; competences: string; ressources: string;
+    heuresParSemaine: number; budget: number; risque: "faible" | "moyen" | "fort";
+    interets: string; objectif: string; dejaFait: string; refus: string;
+  };
+  esprit: { domaines: string[]; niveau: Level; pourquoi: string };
+  verbe: { contexte: string; objectif: string };
+  updated: number;
+}
+
+/* ---------- Plans générés par le Contremaître ---------- */
+
+export interface Exo {
+  nom: string; type: "reps" | "duree"; series: number; cible: number;
+  charge: string; repos: number; consigne: string; alternative: string;
+}
+export interface SeancePlan {
+  date: string; titre: string; focus: string; duree: number; pourquoi: string;
+  echauffement: string; exos: Exo[]; retourAuCalme: string; ajustement: string;
+  /** Saisie en cours, série par série (persistée : survit à une fermeture de l'appli). */
+  faits?: (number | null)[][];
+}
+export interface Programme { ts: number; titre: string; logique: string; semaine: { jour: string; focus: string }[]; progression: string }
+
+export interface Palier { titre: string; pourquoi: string; preuve: string; cash: boolean; jours: number }
+export interface Roadmap { ts: number; vision: string; paliers: Palier[]; index: number }
+export interface MissionSteps { palier: string; ts: number; items: { t: string; done: boolean }[] }
+export interface ConceptPick { date: string; nom: string; pourquoi: string; question: string }
+
+export interface TopicProposal { titre: string; domaine: string; angle: string; difficulte: number }
+export interface Fiche { points: string[]; reperes: string[]; aLire: string }
+export interface EspritChoice { date: string; titre: string; domaine: string; source: "proposition" | "parcours" | "libre"; parcoursId?: string; fiche: Fiche | null }
+export interface Parcours { id: string; theme: string; pourquoi: string; sujets: { titre: string; angle: string }[]; index: number; ts: number }
+
+export interface SubjectAI { texte: string; type: string; pourquoi: string }
+
+export interface Plans {
+  programme: Programme | null;
+  seance: SeancePlan | null;
+  espritProps: { date: string; items: TopicProposal[] } | null;
+  verbe: { date: string; items: SubjectAI[]; index: number } | null;
+}
+
+/** Mémoire du Contremaître : sa lecture d'un pilier, mise à jour par l'IA à partir des données. */
+export interface Memoire { ts: number; synthese: string; forces: string[]; faiblesses: string[]; priorite: string }
 
 export interface CustomMission { titre: string; consigne: string; preuve: string; jours: number }
 
@@ -31,6 +102,7 @@ export interface ConceptExam { ts: number; c: string; ans: string; note: number;
 export interface EspritEntry {
   ts: number; topic: string; ans: string; note: number;
   verdict: string; lacune: string; objection: string; question: string;
+  domaine?: string;
   /** Révisions réussies (3 = gravé). */
   stage: number;
   /** Date de la prochaine révision. */
@@ -66,7 +138,7 @@ export interface HistRow { d: string; corps: number; capital: number; esprit: nu
 export interface Win { ts: number; pillar: PillarId; text: string }
 
 export interface Chantier {
-  v: 1;
+  v: 2;
   created: number;
   lastTick: number;
   lastDay: string;
@@ -91,6 +163,16 @@ export interface Chantier {
   wins: Win[];
   skips: number;
   report: { ts: number; text: string } | null;
+  /* v2 : profil, plans et mémoire */
+  profile: Profile | null;
+  plans: Plans;
+  roadmap: Roadmap | null;
+  missionSteps: MissionSteps | null;
+  concept: ConceptPick | null;
+  espritChoice: EspritChoice | null;
+  parcours: Parcours[];
+  parcoursActif: string | null;
+  memoire: Partial<Record<PillarId, Memoire>>;
 }
 
 export interface GainResult { real: number; halved: boolean }

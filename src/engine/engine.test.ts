@@ -211,3 +211,119 @@ describe("démo et lectures", () => {
     expect(c.p.verbe.s).toBe(10);
   });
 });
+
+/* ---------------- v2 : profil, plans, flux vers l'IA ---------------- */
+import { advanceMission, setsRatio } from "./scoring";
+import { fallbackSeance, ladderRoadmap, parseDose } from "./fallbacks";
+import { emptyProfile, profileGaps } from "@/content/profile";
+import * as S from "@/ai/schemas";
+import { capitalContext, corpsContext, espritContext, verbeContext } from "@/ai/context";
+import { seancePrompt, roadmapPrompt } from "@/ai/prompts";
+
+describe("migration v1 → v2", () => {
+  it("ajoute profil, plans et mémoire sans rien perdre", () => {
+    const v1 = { ...freshChantier(T0), v: 1, euros: 45 } as Record<string, unknown>;
+    ["profile", "plans", "roadmap", "memoire", "parcours"].forEach((k) => delete v1[k]);
+    const c = normalize(v1 as never, T0);
+    expect(c.v).toBe(2);
+    expect(c.euros).toBe(45);
+    expect(c.profile).toBeNull();
+    expect(c.plans).toEqual({ programme: null, seance: null, espritProps: null, verbe: null });
+    expect(c.parcours).toEqual([]);
+  });
+});
+
+describe("profil", () => {
+  it("repère ce qui manque pour que l'IA travaille", () => {
+    expect(profileGaps(null)).toHaveLength(4);
+    const p = emptyProfile();
+    expect(profileGaps(p)).toEqual(["corps", "capital", "esprit"]);
+    p.corps.objectifs = ["force"]; p.capital.competences = "Python, SQL, maths"; p.esprit.domaines = ["Économie"];
+    expect(profileGaps(p)).toEqual([]);
+  });
+});
+
+describe("feuille de route", () => {
+  it("la mission en cours suit la feuille de route personnelle", () => {
+    const c = freshChantier(T0);
+    c.roadmap = { ts: T0, vision: "v", index: 0, paliers: [{ titre: "Donner 3 cours de Python", pourquoi: "p", preuve: "virement", cash: true, jours: 10 }, { titre: "Créer un tableau de bord payant", pourquoi: "p", preuve: "facture", cash: true, jours: 20 }] };
+    expect(currentMission(c).title).toBe("Donner 3 cours de Python");
+    c.missionSteps = { palier: "x", ts: T0, items: [] };
+    advanceMission(c);
+    expect(currentMission(c)).toMatchObject({ title: "Créer un tableau de bord payant", index: 1, total: 2 });
+    expect(c.missionSteps).toBeNull();
+    advanceMission(c);
+    expect(currentMission(c).done).toBe(true);
+  });
+  it("sans feuille de route, retombe sur l'échelle de base", () => {
+    expect(currentMission(freshChantier(T0)).fromRoadmap).toBe(false);
+    expect(ladderRoadmap(2).index).toBe(2);
+  });
+});
+
+describe("séance guidée", () => {
+  it("compte les séries faites", () => {
+    expect(setsRatio([{ faits: [10, 8, null] }, { faits: [0, 30] }])).toEqual({ done: 3, total: 5 });
+  });
+  it("convertit les doses écrites en exercices structurés", () => {
+    expect(parseDose("Pompes", "4 × 12")).toMatchObject({ type: "reps", series: 4, cible: 12 });
+    expect(parseDose("Gainage", "3 × 45 s")).toMatchObject({ type: "duree", series: 3, cible: 45 });
+    expect(parseDose("Respiration", "3 min")).toMatchObject({ type: "duree", series: 1, cible: 180 });
+    expect(fallbackSeance(freshChantier(T0), T0).exos.length).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe("validation des réponses de l'IA", () => {
+  it("nettoie une séance : nombres en texte, champs manquants, bornes", () => {
+    const r = S.SeanceSchema.safeParse({
+      titre: "Poussée", focus: "pecs", duree: "45", pourquoi: "Tu as réussi 4×12 mardi.", echauffement: "5 min",
+      exos: [{ nom: "Pompes", type: "reps", series: "4", cible: "13", repos: 90 }, { nom: "Planche", type: "bizarre", series: 50, cible: 60 }],
+    });
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.duree).toBe(45);
+    expect(r.data.exos[0]).toMatchObject({ series: 4, cible: 13, charge: "", consigne: "" });
+    expect(r.data.exos[1]).toMatchObject({ type: "reps", series: 10 });
+  });
+  it("rejette une réponse incomplète", () => {
+    expect(S.RoadmapSchema.safeParse({ vision: "x", paliers: [] }).success).toBe(false);
+    expect(S.SeanceSchema.safeParse({ titre: "x" }).success).toBe(false);
+    expect(S.ProposalsSchema.safeParse({ sujets: [{ titre: "" , domaine: "x", angle: "y" }, { titre: "a", domaine: "b", angle: "c" }] }).success).toBe(false);
+  });
+  it("lit les booléens écrits en texte", () => {
+    const r = S.PalierSchema.parse({ titre: "t", pourquoi: "p", preuve: "q", cash: "false", jours: "7" });
+    expect(r.cash).toBe(false);
+    expect(S.ExcuseSchema.parse({ verdict: "Non.", categorie: "inconnue", recevable: "true" })).toMatchObject({ categorie: "autre", recevable: true });
+  });
+});
+
+describe("flux de données vers l'IA", () => {
+  const now = startOfDay(T0) + 15 * 3600e3;
+  const c = buildDemo(now);
+  it("le dossier Corps contient profil, records, séances et mémoire", () => {
+    const x = corpsContext(c, now);
+    expect(x.profil?.objectifs).toContain("Prendre du muscle");
+    expect(x.records.length).toBe(4);
+    expect(x.dernieres_seances.length).toBeGreaterThan(0);
+    expect(x.memoire_du_contremaitre?.priorite).toMatch(/jambes/);
+  });
+  it("le dossier Capital contient compétences, mission, actions et euros", () => {
+    const x = capitalContext(c, now);
+    expect(x.profil?.competences).toMatch(/Python/);
+    expect(x.euros_gagnes_seul).toBe(105);
+    expect(x.mission_en_cours?.titre).toBeTruthy();
+    expect(x.actions_recentes.length).toBeGreaterThan(0);
+  });
+  it("les dossiers Esprit et Verbe contiennent l'historique", () => {
+    expect(espritContext(c, now).sujets_deja_traites.length).toBeGreaterThan(10);
+    expect(verbeContext(c, now).derniers_oraux.length).toBe(10);
+  });
+  it("les consignes embarquent le dossier et l'étiquette de tâche", () => {
+    const p = seancePrompt(corpsContext(c, now), { minutes: 30, energie: "basse", materiel: ["Élastiques"], douleur: "genou", demande: "" });
+    expect(p.startsWith("[TACHE:seance]")).toBe(true);
+    expect(p).toContain("30 minutes disponibles");
+    expect(p).toContain("genou");
+    expect(p).toContain("JSON");
+    expect(roadmapPrompt(capitalContext(c, now), "")).toContain("Python");
+  });
+});

@@ -11,17 +11,27 @@ export function freshChantier(now: number): Chantier {
   const p = {} as Chantier["p"];
   PILLAR_IDS.forEach((id) => (p[id] = { s: START_HEIGHT, last: now }));
   return {
-    v: 1, created: now, lastTick: now, lastDay: dayKey(now),
+    v: 2, created: now, lastTick: now, lastDay: dayKey(now),
     p, days: {}, pending: [], excuses: [], seances: [], seanceStart: null, tests: [],
     missionLevel: 0, missions: [], missionLog: [], euros: 0, stake: null, stakesLost: 0, custom: null,
     concepts: [], esprit: [], orals: [], hist: [], wins: [], skips: 0, report: null,
+    profile: null, plans: emptyPlans(), roadmap: null, missionSteps: null, concept: null,
+    espritChoice: null, parcours: [], parcoursActif: null, memoire: {},
   };
 }
 
-/** Complète un chantier chargé (sauvegarde, ancienne version) avec les champs manquants. */
-export function normalize(c: Partial<Chantier>, now = Date.now()): Chantier {
+export const emptyPlans = (): Chantier["plans"] => ({ programme: null, seance: null, espritProps: null, verbe: null });
+
+/**
+ * Complète un chantier chargé (sauvegarde, ancienne version) avec les champs manquants.
+ * v1 → v2 : ajout du profil, des plans, de la feuille de route et de la mémoire ; rien n'est perdu.
+ */
+export function normalize(c: Partial<Chantier> | { v?: number }, now = Date.now()): Chantier {
   const f = freshChantier(now) as unknown as Record<string, unknown>;
-  const out = { ...f, ...c } as Chantier;
+  const out = { ...f, ...(c as object) } as unknown as Chantier;
+  out.v = 2;
+  out.plans = { ...emptyPlans(), ...(out.plans ?? {}) };
+  out.memoire = out.memoire ?? {};
   PILLAR_IDS.forEach((id) => { if (!out.p[id]) out.p[id] = { s: START_HEIGHT, last: now }; });
   return out;
 }

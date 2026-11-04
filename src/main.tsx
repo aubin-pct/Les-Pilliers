@@ -9,7 +9,7 @@ registerSW({ immediate: true });
 if (navigator.storage?.persist) void navigator.storage.persist().catch(() => undefined);
 
 createRoot(document.getElementById("root")!).render(
-  <HashRouter>
+  <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
     <App />
   </HashRouter>,
 );

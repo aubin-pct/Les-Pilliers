@@ -5,7 +5,13 @@ import { gain, win } from "@/engine/core";
 import { POINTS, avgOf, oralPoints } from "@/engine/scoring";
 import { hesit, todaySubject } from "@/engine/insights";
 import type { Oral } from "@/engine/types";
-import { coachOral, type OralCoach } from "@/ai/contremaitre";
+import { aiReady, coachOral, genSubjects } from "@/ai/contremaitre";
+import type { OralCoachSchema } from "@/ai/schemas";
+import type { z } from "zod";
+import { MemoryNote } from "@/features/temple/Memory";
+import { dayKey } from "@/lib/format";
+
+type OralCoach = z.infer<typeof OralCoachSchema>;
 import { f0, f1, fdate, fmtClock, plural, wc } from "@/lib/format";
 import { buzz, keepAwake } from "@/lib/device";
 import { saveAudio } from "@/lib/media";
@@ -45,7 +51,18 @@ export function VerbeView() {
   const typedRef = useRef("");
   const stopping = useRef(false);
   const secs = testHook.secs ?? ORAL_SECONDS;
-  const subj = subject ?? todaySubject(c, now).text;
+  const today = dayKey(now);
+  const plan = c.plans.verbe?.date === today && c.plans.verbe.items.length ? c.plans.verbe : null;
+  const planned = plan ? plan.items[plan.index % plan.items.length] : null;
+  const subj = subject ?? planned?.texte ?? todaySubject(c, now).text;
+  const [loadingSubj, setLoadingSubj] = useState(false);
+  const triedSubj = useRef("");
+  useEffect(() => {
+    if (plan || !aiReady() || triedSubj.current === today) return;
+    triedSubj.current = today;
+    setLoadingSubj(true);
+    genSubjects(true).then((r) => { setLoadingSubj(false); if (r) act((d) => { d.plans.verbe = { date: today, items: r.sujets, index: 0 }; }); });
+  }, [plan, today, act]);
 
   // Abandon propre si on quitte la vue (ne devrait pas arriver : la navigation est bloquée pendant l'oral).
   useEffect(() => () => { cap.current?.release(); setRecording(false); }, [setRecording]);
@@ -149,7 +166,10 @@ export function VerbeView() {
   };
 
   const skip = () => {
-    const g = act((d) => { d.skips += 1; return gain(d, "verbe", POINTS.skipSubject, Date.now(), { floor: false }); });
+    const g = act((d) => {
+      if (d.plans.verbe?.date === dayKey(Date.now())) d.plans.verbe.index += 1; else d.skips += 1;
+      return gain(d, "verbe", POINTS.skipSubject, Date.now(), { floor: false });
+    });
     setSubject(null); gainToast("verbe", g, "fuir un sujet a un prix");
   };
 
@@ -159,10 +179,16 @@ export function VerbeView() {
   return (
     <div className="view">
       <PillarHeader c={c} id="verbe" now={now} />
+      <MemoryNote c={c} id="verbe" />
 
       <Card title="La Tribune" aside={<span className="tag">{Math.round(secs)} secondes · {micMode ? "micro" : "clavier"}</span>}>
         <span className="eyebrow">Sujet imposé</span>
-        <p className="subject">{subj}</p>
+        {loadingSubj && !subject ? <Thinking>Le Contremaître choisit ton sujet</Thinking> : (
+          <>
+            <p className="subject">{subj}</p>
+            {!subject && planned?.pourquoi && <p className="muted small">{planned.pourquoi}</p>}
+          </>
+        )}
         <div className="btn-row"><button className="linkish" type="button" disabled={running} onClick={skip}>Changer de sujet (coûte 1 assise)</button></div>
         <div className={"clock num" + (running ? (left <= 10 ? " over" : " live") : "")}>{fmtClock(running ? left : secs)}</div>
         {micMode ? (

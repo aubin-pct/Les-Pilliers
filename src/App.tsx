@@ -14,6 +14,8 @@ import { CapitalView } from "@/features/capital/CapitalView";
 import { EspritView } from "@/features/esprit/EspritView";
 import { VerbeView } from "@/features/verbe/VerbeView";
 import { ReglagesView } from "@/features/reglages/ReglagesView";
+import { Onboarding } from "@/features/profil/Onboarding";
+import { ProfilView } from "@/features/profil/ProfilView";
 
 /** Érosion vivante : un tic toutes les 30 s et au retour sur l'appli. */
 function useEngineClock() {
@@ -101,9 +103,21 @@ function ScrollTop() {
 export function App() {
   useEngineClock();
   const c = useChantier();
+  const demo = useIsDemo();
   const nav = useNavigate();
   const loc = useLocation();
   useEffect(() => { if (!c && loc.pathname !== "/reglages" && loc.pathname !== "/") nav("/", { replace: true }); }, [c, loc.pathname, nav]);
+  // Profil absent ou accueil inachevé : on passe d'abord par l'accueil (sauf réglages).
+  const onboarding = !!c && !demo && (!c.profile || c.profile.updated === 0) && loc.pathname !== "/reglages";
+  if (onboarding) {
+    return (
+      <>
+        <Header />
+        <main style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 28px)" }}><div className="wrap"><Onboarding /></div></main>
+        <Toast />
+      </>
+    );
+  }
   return (
     <>
       <Header />
@@ -119,6 +133,7 @@ export function App() {
                 <Route path="/capital" element={<CapitalView />} />
                 <Route path="/esprit" element={<EspritView />} />
                 <Route path="/verbe" element={<VerbeView />} />
+                <Route path="/profil" element={<ProfilView />} />
               </>
             ) : (
               <Route path="/" element={<Contract />} />

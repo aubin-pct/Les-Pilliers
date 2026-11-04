@@ -8,6 +8,8 @@ import { erode, freshChantier, gain, rollover, win } from "./core";
 import { applyTest, avgOf, missionPoints, oralPoints, seanceGain } from "./scoring";
 import { localVerdict } from "./verdicts";
 import type { Chantier, Oral, PillarId } from "./types";
+import { dayKey } from "@/lib/format";
+import { demoProfile, fallbackProgramme, fallbackProposals, fallbackSeance, fallbackSubjects, ladderRoadmap } from "./fallbacks";
 
 const EXCUSES: Record<PillarId, string[]> = {
   corps: ["Trop fatigué après les cours.", "Pas le temps, partiel demain.", "Il pleuvait, flemme."],
@@ -98,5 +100,14 @@ export function buildDemo(now: number, N = 47): Chantier {
   c.stake = { amount: 20, level: c.missionLevel, title: LADDER[c.missionLevel].title, set: now - 4 * DAY, deadline: startOfDay(now) + 3 * DAY + 20 * 3600e3 };
   c.missionLog.push({ ts: now - 2 * DAY, text: "Brouillon de l'offre « dépannage PC à domicile, 25 € »" });
   erode(c, now); rollover(c, now);
+  // v2 : profil, feuille de route et plans de démo (contenus statiques, aucun appel IA).
+  c.profile = demoProfile();
+  c.roadmap = ladderRoadmap(c.missionLevel);
+  c.plans.programme = fallbackProgramme();
+  c.plans.seance = fallbackSeance(c, now);
+  c.plans.espritProps = { date: dayKey(now), items: fallbackProposals(c, now) };
+  c.plans.verbe = { date: dayKey(now), items: fallbackSubjects(c, now), index: 0 };
+  c.memoire.corps = { ts: now - 3 * DAY, synthese: "Records de pompes et de gainage en hausse depuis 6 semaines. Les jambes sont négligées : 2 séances sur 14.", forces: ["Régularité en semaine"], faiblesses: ["Jambes", "Week-ends vides"], priorite: "Deux séances jambes par semaine, sans exception." };
+  c.memoire.capital = { ts: now - 3 * DAY, synthese: "105 € gagnés seul en deux missions. L'offre de dépannage stagne au brouillon depuis 10 jours.", forces: ["Passe à l'action quand la mission est claire"], faiblesses: ["Repousse la prospection"], priorite: "Publier l'offre et contacter 10 personnes cette semaine." };
   return c;
 }

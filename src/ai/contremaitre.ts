@@ -1,59 +1,94 @@
 /*
- * Façade du Contremaître : chaque fonction renvoie un résultat typé, ou null si l'IA est absente ou a échoué
- * (l'erreur est affichée) ; l'appelant retombe alors sur les règles locales. En démo, aucun appel.
+ * Façade du Contremaître. Chaque fonction :
+ *  1. construit le dossier du pilier (context.ts) à partir du chantier actif,
+ *  2. appelle le modèle avec la consigne (prompts.ts),
+ *  3. valide et nettoie la réponse (schemas.ts) ; une réponse invalide déclenche un seul nouvel essai,
+ *  4. renvoie un résultat typé, ou null (erreur affichée) : l'appelant garde alors l'état précédent ou ses règles locales.
+ * Aucun appel en démo ni sans clé.
  */
+import type { z } from "zod";
 import { useStore } from "@/store";
 import { toast } from "@/store/ui";
+import type { Chantier, PillarId } from "@/engine/types";
 import { AIError, callModel, type CallOptions } from "./client";
 import * as P from "./prompts";
+import * as S from "./schemas";
+import { capitalContext, corpsContext, espritContext, excuseContext, pillarContext, verbeContext } from "./context";
 
-function available() {
+export function aiReady() {
   const s = useStore.getState();
   return !!s.settings.apiKey.trim() && s.demo === null;
 }
+function chantier(): Chantier | null {
+  const s = useStore.getState();
+  return s.demo ?? s.chantier;
+}
 
-async function ask<T>(prompt: string, o: CallOptions, check: (r: T) => boolean): Promise<T | null> {
-  if (!available()) return null;
-  try {
-    const r = (await callModel(useStore.getState().settings, prompt, o)) as T;
-    if (!check(r)) { toast("Réponse incomplète du Contremaître. Règles de base appliquées.", "loss"); return null; }
-    return r;
-  } catch (e) {
-    toast(e instanceof AIError ? e.message : "Le Contremaître n'a pas répondu.", "loss");
+async function ask<T extends z.ZodTypeAny>(prompt: string, schema: T, o: CallOptions = {}, silent = false): Promise<z.infer<T> | null> {
+  if (!aiReady()) {
+    if (!silent) toast(useStore.getState().demo ? "En démo, le Contremaître IA ne génère rien." : "Branche ta clé DeepSeek dans les réglages.");
     return null;
   }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const raw = await callModel(useStore.getState().settings, prompt, o);
+      const parsed = schema.safeParse(raw);
+      if (parsed.success) return parsed.data;
+      if (import.meta.env.DEV) console.warn("[Contremaître] réponse invalide", parsed.error.issues, raw);
+    } catch (e) {
+      if (!silent) toast(e instanceof AIError ? e.message : "Le Contremaître n'a pas répondu.", "loss");
+      return null;
+    }
+  }
+  if (!silent) toast("Réponse incomplète du Contremaître. Réessaie.", "loss");
+  return null;
 }
-const isNum = (v: unknown) => Number.isFinite(Number(v));
 
-export interface ExcuseVerdict { verdict: string; categorie: string; recevable: boolean }
-export const judgeExcuse = (p: Parameters<typeof P.excusePrompt>[0]) =>
-  ask<ExcuseVerdict>(P.excusePrompt(p), { max: 500 }, (r) => typeof r?.verdict === "string");
+const now = () => Date.now();
 
-export interface EspritExam { note: number; verdict: string; lacune: string; objection: string; question: string; a_lire?: string }
-export const examineEsprit = (topic: string, domain: string, ans: string) =>
-  ask<EspritExam>(P.espritPrompt(topic, domain, ans), { deep: true, max: 900 }, (r) => isNum(r?.note));
+/* ---------------- Corps ---------------- */
+export const genProgramme = (demande = "") => ask(P.programmePrompt(corpsContext(chantier()!, now()), demande), S.ProgrammeSchema, { deep: true, max: 1500 });
+export const genSeance = (ajust: Parameters<typeof P.seancePrompt>[1]) => ask(P.seancePrompt(corpsContext(chantier()!, now()), ajust), S.SeanceSchema, { max: 2200 });
 
-export interface Review { note: number; correction: string }
+/* ---------------- Capital ---------------- */
+export const genRoadmap = (demande = "") => ask(P.roadmapPrompt(capitalContext(chantier()!, now()), demande), S.RoadmapSchema, { deep: true, max: 2500 });
+export const genSteps = () => ask(P.stepsPrompt(capitalContext(chantier()!, now())), S.StepsSchema, { max: 800 });
+export const unblock = (blocage: string) => ask(P.unblockPrompt(capitalContext(chantier()!, now()), blocage), S.UnblockSchema, { max: 700 });
+export const replacePalier = (raison: string) => ask(P.replacePalierPrompt(capitalContext(chantier()!, now()), raison), S.PalierSchema, { max: 700 });
+export const pickConcept = (silent = false) => ask(P.conceptPickPrompt(capitalContext(chantier()!, now())), S.ConceptPickSchema, { max: 600 }, silent);
+export const examineConcept = (concept: string, question: string, mission: string, ans: string) =>
+  ask(P.conceptExamPrompt(concept, question, mission, ans), S.ConceptExamSchema, { deep: true, max: 900 });
+
+/* ---------------- Esprit ---------------- */
+export const genProposals = (envie = "", silent = false) => ask(P.proposalsPrompt(espritContext(chantier()!, now()), envie), S.ProposalsSchema, { max: 1000 }, silent);
+export const genParcours = (theme: string) => ask(P.parcoursPrompt(espritContext(chantier()!, now()), theme), S.ParcoursSchema, { deep: true, max: 1800 });
+export const genFiche = (titre: string) => ask(P.fichePrompt(espritContext(chantier()!, now()), titre), S.FicheSchema, { max: 1500 });
+export const examineEsprit = (topic: string, domain: string, niveau: string, ans: string, fiche: boolean) =>
+  ask(P.espritExamPrompt(topic, domain, niveau, ans, fiche), S.EspritExamSchema, { deep: true, max: 900 });
 export const examineReview = (topic: string, question: string, first: string, ans: string) =>
-  ask<Review>(P.reviewPrompt(topic, question, first, ans), { max: 500 }, (r) => isNum(r?.note));
+  ask(P.reviewPrompt(topic, question, first, ans), S.ReviewSchema, { max: 500 });
 
-export interface ConceptExamAI { note: number; verdict: string; lacune: string; application: string }
-export const examineConcept = (concept: string, mission: string, ans: string) =>
-  ask<ConceptExamAI>(P.conceptPrompt(concept, mission, ans), { deep: true, max: 900 }, (r) => isNum(r?.note));
+/* ---------------- Verbe ---------------- */
+export const genSubjects = (silent = false) => ask(P.subjectsPrompt(verbeContext(chantier()!, now())), S.SubjectsSchema, { max: 800 }, silent);
+export const coachOral = (p: Parameters<typeof P.oralPrompt>[1]) => ask(P.oralPrompt(verbeContext(chantier()!, now()), p), S.OralCoachSchema, { max: 700 });
 
-export interface MissionOrder { titre: string; consigne: string; preuve: string; jours: number }
-export const orderMission = (p: Parameters<typeof P.missionPrompt>[0]) =>
-  ask<MissionOrder>(P.missionPrompt(p), { max: 700 }, (r) => typeof r?.titre === "string" && typeof r?.consigne === "string");
+/* ---------------- Transverse ---------------- */
+export const judgeExcuse = (p: Omit<Parameters<typeof P.excusePrompt>[0], "ctx">) =>
+  ask(P.excusePrompt({ ...p, ctx: excuseContext(chantier()!, now()) }), S.ExcuseSchema, { max: 500 });
 
-export interface OralCoach { structure: number; verdict: string; a_corriger: string; phrase_refaite: string }
-export const coachOral = (p: Parameters<typeof P.oralPrompt>[0]) =>
-  ask<OralCoach>(P.oralPrompt(p), { max: 700 }, (r) => typeof r?.verdict === "string");
+export const genMemoire = (id: PillarId, nom: string, silent = false) =>
+  ask(P.memoirePrompt(nom, pillarContext(chantier()!, id, now())), S.MemoireSchema, { deep: true, max: 900 }, silent);
 
-export const weeklyReport = (data: unknown) =>
-  ask<string>(P.reportPrompt(data), { json: false, deep: true, max: 900 }, (r) => typeof r === "string" && r.length > 20);
+export async function weeklyReport(data: unknown): Promise<string | null> {
+  if (!aiReady()) return null;
+  try {
+    const r = String(await callModel(useStore.getState().settings, P.reportPrompt(data), { json: false, deep: true, max: 900 }));
+    return r.length > 20 ? r : null;
+  } catch (e) { toast(e instanceof AIError ? e.message : "Le Contremaître n'a pas répondu.", "loss"); return null; }
+}
 
 /** Test de la clé : lève l'erreur au lieu de la convertir en message. */
 export async function testKey() {
-  const r = (await callModel(useStore.getState().settings, P.testKeyPrompt, { max: 200 })) as { phrase?: string };
-  return r?.phrase || "Au travail.";
+  const r = S.TestKeySchema.safeParse(await callModel(useStore.getState().settings, P.testKeyPrompt, { max: 200 }));
+  return (r.success && r.data.phrase) || "Au travail.";
 }

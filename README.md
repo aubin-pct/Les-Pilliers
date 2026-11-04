@@ -15,7 +15,7 @@ Application web installable (PWA) en React + TypeScript. Tes données restent su
 2. « Partager » → « Sur l'écran d'accueil » (iPhone) ou menu ⋮ → « Installer l'application » (Android).
 3. Dans l'appli : roue crantée → colle ta clé API DeepSeek (platform.deepseek.com) → « Tester la clé ».
 
-Sans clé, l'appli fonctionne avec ses règles de base. Le Contremaître IA ajoute les verdicts personnalisés, les examens, les missions sur mesure et le coaching d'éloquence.
+L'accueil te demande ta clé DeepSeek puis ton profil (corps, capital, esprit, verbe) : tout ce que l'appli te propose est construit par l'IA à partir de ce profil, de tes résultats et de sa mémoire de toi. Le profil se modifie à tout moment (réglages → Modifier mon profil).
 
 ## Développer
 
