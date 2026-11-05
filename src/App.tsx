@@ -3,7 +3,8 @@ import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from
 import { PILLAR_IDS, PILLAR } from "@/content/pillars";
 import { daysSinceStart, doneToday } from "@/engine/core";
 import { pad } from "@/lib/format";
-import { reacquireWake } from "@/lib/device";
+import { buzz, reacquireWake } from "@/lib/device";
+import { Stamp } from "@/ui/motion";
 import { aiEnabled, useChantier, useIsDemo, useSettings, useStore } from "@/store";
 import { toast } from "@/store/ui";
 import { Toast, useNow } from "@/ui/kit";
@@ -76,22 +77,36 @@ function TabBar() {
   const c = useChantier()!;
   const recording = useStore((s) => s.recording);
   const now = useNow(30_000);
+  const top = Math.max(60, ...PILLAR_IDS.map((id) => c.p[id].s)) * 1.05;
   const tabs = [
-    { to: "/", label: "Temple", glyph: <TempleGlyph />, dot: c.pending.length > 0 },
-    ...PILLAR_IDS.map((id) => ({ to: "/" + id, label: PILLAR[id].name, glyph: PILLAR[id].roman, dot: !doneToday(c, id, now) })),
+    { to: "/", label: "Temple", glyph: <TempleGlyph />, dot: c.pending.length > 0, color: "var(--brass)", fill: null as number | null },
+    ...PILLAR_IDS.map((id) => ({ to: "/" + id, label: PILLAR[id].name, glyph: PILLAR[id].roman, dot: !doneToday(c, id, now), color: PILLAR[id].color, fill: c.p[id].s / top })),
   ];
   return (
     <nav className="tabs" aria-label="Chantiers">
       <div className="row">
         {tabs.map((t) => (
-          <NavLink key={t.to} to={t.to} end className="tab" aria-disabled={recording || undefined}
-            onClick={(e) => { if (recording) { e.preventDefault(); toast("Termine ta prise de parole d'abord."); } }}>
-            <span className="glyph">{t.glyph}</span><span className="lbl">{t.label}</span>{t.dot && <span className="dot" />}
+          <NavLink key={t.to} to={t.to} end className="tab" aria-disabled={recording || undefined} style={{ ["--tc" as string]: t.color }} aria-label={t.label + (t.dot ? (t.to === "/" ? ", comptes à rendre" : ", plancher nu") : "")}
+            onClick={(e) => { if (recording) { e.preventDefault(); toast("Termine ta prise de parole d'abord."); } else buzz(8); }}>
+            <span className="glyph">
+              {t.fill !== null && <span className="gauge" aria-hidden="true"><span style={{ height: `${Math.max(6, Math.min(100, t.fill * 100))}%` }} /></span>}
+              {t.glyph}
+            </span>
+            <span className="lbl">{t.label}</span>{t.dot && <span className="dot" aria-hidden="true" />}
           </NavLink>
         ))}
       </div>
     </nav>
   );
+}
+
+/** Couleur d'accent de la page : celle du pilier ouvert. */
+function useAccent() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const id = pathname.slice(1);
+    document.documentElement.dataset.pillar = (PILLAR_IDS as string[]).includes(id) ? id : "temple";
+  }, [pathname]);
 }
 
 function ScrollTop() {
@@ -102,6 +117,7 @@ function ScrollTop() {
 
 export function App() {
   useEngineClock();
+  useAccent();
   const c = useChantier();
   const demo = useIsDemo();
   const nav = useNavigate();
@@ -124,7 +140,8 @@ export function App() {
       <ScrollTop />
       <main style={c ? undefined : { paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 28px)" }}>
         <div className="wrap">
-          <Routes>
+          <div className="route" key={loc.pathname}>
+          <Routes location={loc}>
             <Route path="/reglages" element={<ReglagesView />} />
             {c ? (
               <>
@@ -140,10 +157,12 @@ export function App() {
             )}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </div>
         </div>
       </main>
       {c && <TabBar />}
       <Toast />
+      <Stamp />
     </>
   );
 }

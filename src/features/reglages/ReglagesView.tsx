@@ -10,6 +10,7 @@ import { f0, f1, fdate, fdateK } from "@/lib/format";
 import { aiEnabled, useChantier, useIsDemo, useSettings, useStore } from "@/store";
 import { toast } from "@/store/ui";
 import { Card, Foreman, Sheet, Thinking } from "@/ui/kit";
+import { HoldButton } from "@/ui/HoldButton";
 
 export function ReglagesView() {
   const settings = useSettings();
@@ -24,13 +25,11 @@ export function ReglagesView() {
   const [model, setModel] = useState(settings.model);
   const [deep, setDeep] = useState(settings.deep);
   const [test, setTest] = useState<{ busy: boolean; ok?: string; err?: string }>({ busy: false });
-  const [armed, setArmed] = useState(false);
   const [usage, setUsage] = useState("");
   const [restore, setRestore] = useState<Backup | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { navigator.storage?.estimate?.().then((e) => setUsage(`Espace utilisé : ${f1((e.usage ?? 0) / 1048576)} Mo`)).catch(() => undefined); }, []);
-  useEffect(() => { if (!armed) return; const t = setTimeout(() => setArmed(false), 4000); return () => clearTimeout(t); }, [armed]);
 
   const saveForm = () => setSettings({ apiKey: key.trim(), baseUrl: base.trim() || "https://api.deepseek.com", model: model.trim() || "deepseek-flash", deep });
   const runTest = async () => {
@@ -112,13 +111,10 @@ export function ReglagesView() {
           {demo ? <button className="btn" type="button" onClick={() => { quitDemo(); nav("/"); }}>Quitter la démo</button>
             : <button className="btn" type="button" onClick={() => { startDemo(); nav("/"); }}>Voir la démo</button>}
           {real && !demo && (
-            <button className="btn danger" type="button" onClick={async () => {
-              if (!armed) { setArmed(true); return; }
-              setArmed(false); wipe(); await clearMedia().catch(() => undefined); nav("/"); toast("Chantier rasé.");
-            }}>{armed ? "Confirmer : tout effacer" : "Tout effacer"}</button>
+            <HoldButton tone="danger" ms={2000} label="Tout effacer" hint="Destruction" onConfirm={async () => { wipe(); await clearMedia().catch(() => undefined); nav("/"); toast("Chantier rasé."); }} />
           )}
         </div>
-        {armed && <p className="down small">Chantier, oraux, photos : tout disparaît de ce téléphone. Exporte d'abord si tu veux garder une trace.</p>}
+        {real && !demo && <p className="muted small">« Tout effacer » : maintiens deux secondes. Chantier, oraux, photos : tout disparaît de ce téléphone. Exporte d'abord si tu veux garder une trace.</p>}
       </Card>
 
       {!c && <button className="btn primary block" type="button" onClick={() => nav("/")}>Retour au contrat</button>}

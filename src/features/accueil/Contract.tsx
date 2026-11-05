@@ -2,6 +2,7 @@ import { MISS_PENALTY } from "@/content/pillars";
 import { buzz } from "@/lib/device";
 import { useStore } from "@/store";
 import { toast } from "@/store/ui";
+import { HoldButton } from "@/ui/HoldButton";
 
 export function Contract() {
   const sign = useStore((s) => s.sign);
@@ -22,7 +23,7 @@ export function Contract() {
         </ol>
       </div>
       <div className="btn-row">
-        <button className="btn primary block" type="button" onClick={() => { sign(); buzz(80); toast("Contrat signé. Pose ta première pierre."); }}>Je signe le contrat</button>
+        <HoldButton block ms={1400} label="Maintenir pour signer" hint="Tu t'engages" onConfirm={() => { sign(); buzz(80); toast("Contrat signé. Pose ta première pierre."); }} />
         <button className="btn ghost block" type="button" onClick={startDemo}>Voir 47 jours de démo</button>
       </div>
       <p className="muted small" style={{ textAlign: "center" }}>Tes données restent sur ce téléphone.</p>

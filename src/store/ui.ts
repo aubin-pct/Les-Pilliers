@@ -9,6 +9,9 @@ type ToastKind = "gain" | "loss" | undefined;
 
 interface UIState {
   toast: { id: number; msg: string; kind: ToastKind } | null;
+  /** Tampon de gain ou de perte (affiché par <Stamp />). */
+  stampData: { id: number; pillar: PillarId; value: number; caption?: string } | null;
+  stamp: (pillar: PillarId, value: number, caption?: string) => void;
   drafts: Record<string, string>;
   show: (msg: string, kind?: ToastKind) => void;
   hide: () => void;
@@ -18,6 +21,8 @@ interface UIState {
 
 export const useUI = create<UIState>()((set) => ({
   toast: null,
+  stampData: null,
+  stamp: (pillar, value, caption) => set({ stampData: { id: Date.now() + Math.random(), pillar, value, caption } }),
   drafts: {},
   show: (msg, kind) => set({ toast: { id: Date.now() + Math.random(), msg, kind } }),
   hide: () => set({ toast: null }),
@@ -27,11 +32,14 @@ export const useUI = create<UIState>()((set) => ({
 
 export const toast = (msg: string, kind?: ToastKind) => useUI.getState().show(msg, kind);
 
+/** Gain ou perte d'assises : tampon plein écran dans la couleur du pilier, et retour haptique. */
 export function gainToast(id: PillarId, r: GainResult, extra?: string) {
-  const sign = r.real >= 0 ? "+" : "−";
-  toast(`${sign}${f1(Math.abs(r.real))} assises · ${PILLAR[id].name}${r.halved ? " (÷2, comptes en attente)" : ""}${extra ? " · " + extra : ""}`, r.real >= 0 ? "gain" : "loss");
-  buzz(r.real >= 0 ? 30 : [60, 60, 60]);
+  const caption = [r.halved ? "÷2 : comptes en attente" : "", extra ?? ""].filter(Boolean).join(" · ");
+  useUI.getState().stamp(id, r.real, caption || undefined);
+  buzz(r.real >= 0 ? [20, 30, 40] : [80, 60, 80]);
 }
+/** Texte du gain, pour les lecteurs d'écran et les tests. */
+export const gainText = (id: PillarId, r: GainResult) => `${r.real >= 0 ? "+" : "−"}${f1(Math.abs(r.real))} assises · ${PILLAR[id].name}`;
 
 /** Champ de saisie dont la valeur survit aux re-rendus et aux changements d'onglet. */
 export function useDraft(key: string): [string, (v: string) => void, () => void] {

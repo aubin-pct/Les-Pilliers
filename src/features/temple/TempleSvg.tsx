@@ -5,6 +5,7 @@ import { PILLAR, PILLAR_IDS } from "@/content/pillars";
 import { doneToday } from "@/engine/core";
 import type { Chantier, PillarId } from "@/engine/types";
 import { DAY, f1, mulberry32 } from "@/lib/format";
+import { skyPhase } from "@/ui/motion";
 
 type Scores = Record<PillarId, number>;
 
@@ -31,7 +32,19 @@ function useAnimated(target: Scores): Scores {
   return cur;
 }
 
-export function TempleSvg({ c, now }: { c: Chantier; now: number }) {
+const SKY = {
+  nuit: ["#07090d", "#121722", "#1a2030"],
+  aube: ["#141824", "#3a2c2a", "#8a5a3a"],
+  jour: ["#1a2129", "#26303a", "#3a4550"],
+  crepuscule: ["#120f14", "#3a1e1e", "#9a4a2a"],
+} as const;
+
+/** Étoiles fixes (graine) : position et scintillement stables d'un rendu à l'autre. */
+const STARS = (() => { const r = mulberry32(2026); return Array.from({ length: 46 }, () => ({ x: r() * 360, y: r() * 150, s: 0.3 + r() * 0.9, d: (r() * 4).toFixed(2) })); })();
+
+export function TempleSvg({ c, now, onPick }: { c: Chantier; now: number; onPick?: (id: PillarId) => void }) {
+  const phase = skyPhase(new Date(now).getHours());
+  const [s0, s1, s2] = SKY[phase];
   const target = {} as Scores;
   PILLAR_IDS.forEach((id) => (target[id] = c.p[id].s));
   const scores = useAnimated(target);
@@ -42,9 +55,17 @@ export function TempleSvg({ c, now }: { c: Chantier; now: number }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={"Les quatre piliers : " + PILLAR_IDS.map((id) => `${PILLAR[id].name} ${f1(c.p[id].s)} assises`).join(", ")}>
       <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={s0} /><stop offset=".62" stopColor={s1} /><stop offset="1" stopColor={s2} /></linearGradient>
+        <radialGradient id="halo" cx=".5" cy="1" r=".7"><stop offset="0" stopColor="#c9a54e" stopOpacity={phase === "nuit" ? 0.08 : 0.18} /><stop offset="1" stopColor="#c9a54e" stopOpacity="0" /></radialGradient>
         <linearGradient id="shaft" x1="0" x2="1"><stop offset="0" stopColor="#b9b2a4" /><stop offset=".35" stopColor="#e6dfd0" /><stop offset=".7" stopColor="#cfc8b9" /><stop offset="1" stopColor="#9e978a" /></linearGradient>
         <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2e3238" /><stop offset="1" stopColor="#16181c" /></linearGradient>
       </defs>
+      <rect x="0" y="0" width={W} height={ground} fill="url(#sky)" />
+      <rect x="0" y="60" width={W} height={ground - 60} fill="url(#halo)" />
+      {phase === "nuit" && STARS.map((st, i) => <circle key={i} className="star" cx={st.x.toFixed(1)} cy={st.y.toFixed(1)} r={st.s.toFixed(2)} fill="#e6dfd0" style={{ animationDelay: `-${st.d}s` }} />)}
+      {phase === "nuit" && <g opacity=".85"><circle cx="300" cy="44" r="13" fill="#e6dfd0" /><circle cx="306" cy="40" r="12" fill={s0} /></g>}
+      {phase !== "nuit" && <circle cx={phase === "aube" ? 52 : phase === "crepuscule" ? 308 : 180} cy={phase === "jour" ? 40 : 150} r="16" fill="#e8b468" opacity={phase === "jour" ? 0.25 : 0.55} />}
+      <path d={`M0 ${ground} L40 ${ground - 22} L90 ${ground - 8} L150 ${ground - 30} L210 ${ground - 10} L270 ${ground - 26} L330 ${ground - 6} L360 ${ground - 18} L360 ${ground} Z`} fill="#0d0f13" opacity=".7" />
       <rect x="6" y={ground} width={W - 12} height="12" fill="url(#ground)" />
       <rect x="0" y={ground + 12} width={W} height="8" fill="#1d2025" />
       <rect x="0" y={ground} width={W} height="1" fill="#3a3f46" />
@@ -68,7 +89,11 @@ export function TempleSvg({ c, now }: { c: Chantier; now: number }) {
         });
         const dust = done ? [] : Array.from({ length: 4 }, () => ({ dx: (rnd() - 0.5) * 50, r: 0.8 + rnd() * 1.2, delay: (rnd() * 2.4).toFixed(2) }));
         return (
-          <g key={id}>
+          <g key={id} className={onPick ? "pillar-hit" : undefined} role={onPick ? "link" : undefined} tabIndex={onPick ? 0 : undefined} aria-label={onPick ? `Ouvrir ${P.name}` : undefined}
+            onClick={onPick ? () => onPick(id) : undefined} onKeyDown={onPick ? (e) => { if (e.key === "Enter") onPick(id); } : undefined}>
+            <rect x={cx - 34} y={top - 6} width="68" height={ground - top + 6} fill="transparent" />
+            {!done && <ellipse cx={cx} cy={yTop - 13} rx="40" ry="12" fill="var(--blood)" opacity=".08" />}
+            {done && <ellipse cx={cx} cy={ground - baseH} rx="44" ry="8" style={{ fill: P.color }} opacity=".18" />}
             <rect x={cx - 26} y={ground - baseH} width="52" height={baseH} fill="#8e8779" />
             <rect x={cx - 26} y={ground - baseH} width="52" height="2" fill="#a59e90" />
             <rect x={cx - 19} y={yTop} width="38" height={h} fill="url(#shaft)" />

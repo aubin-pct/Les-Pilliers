@@ -7,10 +7,13 @@ import { genSeance } from "@/ai/contremaitre";
 import { EQUIPMENT } from "@/content/profile";
 import { gain } from "@/engine/core";
 import { fallbackSeance } from "@/engine/fallbacks";
-import { POINTS, seanceGain, setsRatio } from "@/engine/scoring";
+import { POINTS, setsRatio } from "@/engine/scoring";
+import { HoldButton } from "@/ui/HoldButton";
+import { FocusSession } from "./FocusSession";
+import { faitsOf, fillExo, finishSession, setSet } from "./session";
 import type { Chantier, SeancePlan } from "@/engine/types";
 import { beep, buzz, keepAwake } from "@/lib/device";
-import { dayKey, fdate, fmtDur } from "@/lib/format";
+import { dayKey, fmtDur } from "@/lib/format";
 import { useStore } from "@/store";
 import { gainToast, toast } from "@/store/ui";
 import { Card, Foreman, Thinking } from "@/ui/kit";
@@ -73,7 +76,8 @@ function Prepare({ c, now, onDone, canCancel }: { c: Chantier; now: number; onDo
     if (r) { act((d) => { d.plans.seance = { date: dayKey(Date.now()), ...r }; }); onDone(); }
   };
   return (
-    <Card title="Séance du jour" aside={day ? <span className="tag">prévu : {day.focus}</span> : <span className="tag">à préparer</span>}>
+    <Card title="Séance du jour" aside="à préparer">
+      {day && <p className="planned"><span className="eyebrow">Prévu aujourd'hui</span><b>{day.focus}</b></p>}
       <p className="muted small">Dis au Contremaître dans quel état tu es. Il construit la séance à partir de ton programme, de tes dernières séances et de tes records.</p>
       <Segmented label="Temps disponible (minutes)" value={minutes} options={durations} onChange={setMinutes} />
       <Segmented label="Énergie" value={energie} options={ENERGY} onChange={setEnergie} />
@@ -111,11 +115,13 @@ function PlanView({ plan }: { plan: SeancePlan }) {
 
 function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
   const act = useStore((s) => s.act);
+  const [focus, setFocus] = useState(true);
   const [rest, setRest] = useState<{ end: number; nom: string } | null>(null);
   const [left, setLeft] = useState(0);
   const [rpe, setRpe] = useState<number | null>(null);
   const [note, setNote] = useState("");
-  const faits = plan.faits ?? plan.exos.map((e) => Array(e.series).fill(null));
+  const faits = faitsOf(plan);
+  const { done, total } = setsRatio(faits.map((f) => ({ faits: f })));
 
   useEffect(() => { void keepAwake(true); return () => { void keepAwake(false); }; }, []);
   useEffect(() => {
@@ -128,38 +134,16 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
     return () => clearInterval(t);
   }, [rest]);
 
-  const setVal = (i: number, k: number, raw: string) => {
-    const v = raw === "" ? null : Math.max(0, Math.round(Number(raw.replace(",", "."))));
-    act((d) => {
-      const s = d.plans.seance; if (!s) return;
-      s.faits = s.faits ?? s.exos.map((e) => Array(e.series).fill(null));
-      s.faits[i][k] = Number.isFinite(v as number) ? v : null;
-    });
-  };
   const committed = (i: number, k: number) => { if (faits[i][k] !== null && plan.exos[i].repos > 0) setRest({ end: Date.now() + plan.exos[i].repos * 1000, nom: plan.exos[i].nom }); };
-  const fillAll = (i: number) => act((d) => { const s = d.plans.seance; if (!s) return; s.faits = s.faits ?? s.exos.map((e) => Array(e.series).fill(null)); s.faits[i] = s.faits[i].map((x) => x ?? s.exos[i].cible); });
-
-  const finish = () => {
-    const dur = Math.round((Date.now() - (c.seanceStart ?? Date.now())) / 60000);
-    const logs = plan.exos.map((e, i) => ({ exo: e.nom, type: e.type, cible: e.cible, faits: faits[i], charge: e.charge || undefined }));
-    const { done, total } = setsRatio(logs);
-    if (dur < 5) { toast(`${dur} min de chrono. Cinq minimum.`); return; }
-    if (done < total / 2) { toast(`${done}/${total} séries. Il en faut au moins la moitié.`); return; }
-    if (rpe === null) { toast("Note l'effort, de 1 à 10."); return; }
-    const r = act((d) => {
-      d.seances.push({ ts: Date.now(), type: plan.titre, dur, done, total, proof: `${done}/${total} séries`, timed: true, rpe, note: note.trim() || undefined, logs });
-      d.seanceStart = null;
-      return gain(d, "corps", seanceGain(dur, done, total), Date.now());
-    });
-    gainToast("corps", r);
-  };
 
   return (
-    <Card title="Séance en cours" aside={<span className="tag">{plan.titre}</span>}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", gap: 12 }}>
+    <Card title="Séance en cours" aside={plan.titre}>
+      <div className="run-head">
         <div><span className="eyebrow">Chrono</span><div className="elapsed">{fmtDur(now - (c.seanceStart ?? now))}</div></div>
-        <button className="linkish" type="button" onClick={() => act((d) => { d.seanceStart = null; })}>Abandonner</button>
+        <div className="run-progress"><span className="num">{done}/{total}</span><span className="muted">séries</span></div>
       </div>
+      <div className="bar" aria-hidden="true"><span style={{ width: `${total ? (done / total) * 100 : 0}%` }} /></div>
+      <button className="btn primary block big" type="button" onClick={() => setFocus(true)}>Plein écran</button>
       <p className="small"><b>Échauffement.</b> <span className="muted">{plan.echauffement}</span></p>
       <div>
         {plan.exos.map((e, i) => (
@@ -169,9 +153,9 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
             <div className="sets">
               {faits[i].map((v, k) => (
                 <input key={k} type="number" inputMode="numeric" aria-label={`${e.nom}, série ${k + 1}`} placeholder={String(e.cible)} value={v ?? ""}
-                  className={v === null ? "" : v >= e.cible ? "ok" : "ko"} onChange={(x) => setVal(i, k, x.target.value)} onBlur={() => committed(i, k)} />
+                  className={v === null ? "" : v >= e.cible ? "ok" : "ko"} onChange={(x) => setSet(i, k, x.target.value === "" ? null : Number(x.target.value.replace(",", ".")))} onBlur={() => committed(i, k)} />
               ))}
-              <button className="btn small ghost" type="button" onClick={() => fillAll(i)}>Tout réussi</button>
+              <button className="btn small ghost" type="button" onClick={() => fillExo(i)}>Tout réussi</button>
             </div>
             {e.alternative && <span className="muted" style={{ fontSize: 12 }}>Trop dur : {e.alternative}</span>}
           </div>
@@ -180,12 +164,15 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
       {plan.retourAuCalme && <p className="small"><b>Retour au calme.</b> <span className="muted">{plan.retourAuCalme}</span></p>}
       <hr className="sep" />
       <span className="muted small">Effort ressenti (1 = facile, 10 = à fond)</span>
-      <div className="rpe">{Array.from({ length: 10 }, (_, k) => k + 1).map((n) => <button key={n} type="button" aria-pressed={rpe === n} onClick={() => setRpe(n)}>{n}</button>)}</div>
+      <div className="rpe">{Array.from({ length: 10 }, (_, k) => k + 1).map((n) => <button key={n} type="button" aria-pressed={rpe === n} onClick={() => { setRpe(n); buzz(10); }}>{n}</button>)}</div>
       <label className="f" htmlFor="se-note">Sensations, douleurs (facultatif)<input id="se-note" type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex. : épaule qui tire sur les dips" /></label>
-      <button className="btn primary block" type="button" onClick={finish}>Valider la séance</button>
-      <p className="muted small">Validation après 5 minutes de chrono et au moins la moitié des séries. Note ce que tu as vraiment fait : la prochaine séance en dépend.</p>
+      <HoldButton block label="Valider la séance" onConfirm={() => { const err = finishSession(rpe, note); if (err) toast(err); }} />
+      <div className="btn-row spread">
+        <p className="muted small">Validation après 5 minutes de chrono et la moitié des séries.</p>
+        <button className="linkish" type="button" onClick={() => act((d) => { d.seanceStart = null; })}>Abandonner</button>
+      </div>
       {rest && <div className="rest" role="status">Repos · {rest.nom} <b className="num">{Math.max(0, left)}</b><button className="btn small ghost" type="button" onClick={() => setRest(null)}>Passer</button></div>}
-      {c.seances.length > 0 && <p className="muted" style={{ fontSize: 12 }}>Dernière séance : {fdate(c.seances[c.seances.length - 1].ts)}</p>}
+      {focus && <FocusSession plan={plan} start={c.seanceStart ?? now} onClose={() => setFocus(false)} />}
     </Card>
   );
 }

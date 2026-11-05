@@ -12,6 +12,7 @@ import { gainToast, toast, useDraft } from "@/store/ui";
 import { Card, Foreman, PillarHeader, Thinking, useNow } from "@/ui/kit";
 import { MemoryNote } from "@/features/temple/Memory";
 import { ExamResult, type ExamView } from "@/features/esprit/ExamResult";
+import { HoldButton } from "@/ui/HoldButton";
 import { ProofSheet } from "./ProofSheet";
 
 export function CapitalView() {
@@ -224,7 +225,7 @@ function MissionCard({ now }: { now: number }) {
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { void onPhoto(e.target.files?.[0]); e.target.value = ""; }} />
       </div>
       <div className="btn-row">
-        <button className="btn primary" type="button" onClick={() => void deliver()}>Déclarer la mission livrée</button>
+        <HoldButton label="Déclarer la mission livrée" hint="Livraison" onConfirm={() => void deliver()} />
         {!stake && <button className="btn" type="button" onClick={() => setPanel(panel === "mise" ? "" : "mise")}>Engager une mise</button>}
       </div>
       {panel === "mise" && !stake && (
@@ -234,7 +235,7 @@ function MissionCard({ now }: { now: number }) {
             <label className="f" htmlFor="st-days">Délai (jours)<input type="number" id="st-days" inputMode="numeric" min="2" max="30" value={stakeDays} onChange={(e) => setStakeDays(e.target.value)} /></label>
           </div>
           <p className="muted small">Engagement d'honneur : l'appli ne touche pas à ton argent. Si tu échoues, verse-la vraiment à une association. Le registre s'en souviendra.</p>
-          <div><button className="btn danger" type="button" onClick={engage}>Je m'engage</button></div>
+          <div><HoldButton tone="danger" ms={1200} label="Je m'engage" hint="Engagement" onConfirm={engage} /></div>
         </>
       )}
     </Card>

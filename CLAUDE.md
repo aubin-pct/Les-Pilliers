@@ -89,6 +89,22 @@ Si on change un barème : mettre à jour `POINTS`, l'écran « Les règles » (`
 
 ## Interface
 
+### Direction visuelle (v4)
+Carrière de pierre la nuit, temple en construction. Matières : granit (grain SVG en surimpression, `body::after`), dalles taillées (`.card` : dégradé, arête claire en haut, ombre en bas, rayon 12 px), gravure (titres avec ombre portée claire/sombre), laiton martelé (`.btn.primary`). La couleur d'accent `--acc` suit le pilier ouvert (`html[data-pillar]`, posé par `useAccent` dans `App.tsx`) : filets, focus, titres de cartes, puces, barre d'onglets.
+
+### Composants de geste
+- `ui/HoldButton.tsx` : maintenir pour confirmer (signer le contrat 1,4 s, valider une séance, livrer une mission, engager une mise 1,2 s, tout effacer 2 s). Vibre à chaque quart. À utiliser pour tout engagement ; jamais pour une action courante.
+- `ui/motion.tsx` : `useRolling` (nombres qui roulent), `<Stamp />` (tampon plein écran « +6,2 » dans la couleur du pilier, secousse rouge pour une perte ; alimenté par `gainToast`), `skyPhase` (ciel du Temple : nuit étoilée, aube, jour, crépuscule).
+- `PillarHeader` (kit) : en-tête « monument » de chaque pilier (colonne miniature, nom gravé, hauteur qui roule, tendance 7 j, puces d'état, courbe de 30 jours).
+- `Sheet` : panneau qui se ferme en le faisant glisser vers le bas (zone de préhension), ou avec le retour.
+- Barre d'onglets : chaque pilier porte une jauge de hauteur et un point rouge si le plancher est nu.
+- Temple : piliers cliquables (ouvrent leur chantier).
+- `features/corps/FocusSession.tsx` : séance plein écran, un exercice et une série à la fois (− / + au pouce, « Série faite », anneau de repos +15 s, séries chronométrées, balayage gauche/droite, fin avec ressenti et validation maintenue). Actions partagées avec la vue liste dans `features/corps/session.ts`.
+- Tribune : anneau de temps restant et halo qui réagit au volume de la voix (`--lvl`).
+
+### Mouvement
+Entrées de page et de cartes par translation seule (jamais d'opacité de départ : le contenu reste lisible si l'animation ne tourne pas). Tout est coupé sous `prefers-reduced-motion`.
+
 - Thème sombre unique. Couleurs uniquement via les variables de `:root` : `--c-corps`, `--c-capital`, `--c-esprit`, `--c-verbe`, `--brass` (ce qui se gagne), `--blood` (ce qui se perd). Polices : Big Shoulders Display (titres), Archivo (texte), IBM Plex Mono (chiffres, voix du Contremaître).
 - Gouttière de 16 px, zones sûres `env(safe-area-inset-*)`, champs en 16 px contre le zoom d'iOS, colonne max 520 px.
 - Panneaux : `<Sheet>` ; le bouton retour d'Android ferme la couche du dessus grâce à `lib/layers.ts` (le compteur de pompes l'utilise aussi). Ne pas manipuler `history` ailleurs.

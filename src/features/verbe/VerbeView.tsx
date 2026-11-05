@@ -190,10 +190,16 @@ export function VerbeView() {
           </>
         )}
         <div className="btn-row"><button className="linkish" type="button" disabled={running} onClick={skip}>Changer de sujet (coûte 1 assise)</button></div>
-        <div className={"clock num" + (running ? (left <= 10 ? " over" : " live") : "")}>{fmtClock(running ? left : secs)}</div>
+        <div className={"tribune" + (running ? " on" : "")} style={{ ["--lvl" as string]: Math.min(1, level * 9).toFixed(3) }}>
+          <svg className="tribune-ring" viewBox="0 0 220 220" aria-hidden="true">
+            <circle cx="110" cy="110" r="96" className="ring-bg" />
+            <circle cx="110" cy="110" r="96" className="ring-fg" strokeDasharray={`${(2 * Math.PI * 96 * (running ? left / secs : 1)).toFixed(1)} ${(2 * Math.PI * 96).toFixed(1)}`} transform="rotate(-90 110 110)" />
+          </svg>
+          <span className="tribune-glow" aria-hidden="true" />
+          <div className={"clock num" + (running ? (left <= 10 ? " over" : " live") : "")}>{fmtClock(running ? left : secs)}</div>
+        </div>
         {micMode ? (
           <>
-            <div className="meter" aria-hidden="true"><span style={{ width: `${Math.min(100, level * 900)}%` }} /></div>
             <div className="livebar"><span>Blancs : {blanks}</span><span>{srFailed ? "Transcription indisponible : voix et blancs seulement" : "Transcription en direct"}</span></div>
             <div className="transcript" aria-live="off">
               {running || live.finals ? <>{live.finals} {live.interim && <span className="interim">{live.interim}</span>}</> : <span className="muted">Ta voix est enregistrée et archivée. Les blancs, le débit et les tics sont mesurés.</span>}

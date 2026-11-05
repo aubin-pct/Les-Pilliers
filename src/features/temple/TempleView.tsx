@@ -60,7 +60,7 @@ export function TempleView() {
         </div>
       )}
 
-      <Foreman say={fl.say} sub={fl.sub} />
+      <Foreman who={c.profile?.prenom ? `Le Contremaître · à ${c.profile.prenom}` : "Le Contremaître"} say={fl.say} sub={fl.sub} />
 
       {c.pending.length > 0 && (
         <div className="alert">
@@ -72,7 +72,7 @@ export function TempleView() {
       )}
 
       <div className="temple">
-        <TempleSvg c={c} now={now} />
+        <TempleSvg c={c} now={now} onPick={(id) => nav("/" + id)} />
         <div className="plabels">
           {PILLAR_IDS.map((id) => {
             const P = PILLAR[id], wd = weekDelta(c, id);
