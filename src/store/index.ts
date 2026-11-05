@@ -14,6 +14,7 @@ import type { Chantier, Settings } from "@/engine/types";
 
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: "", baseUrl: "https://api.deepseek.com", model: "deepseek-flash", deep: false, oralMode: "micro", lastBackup: "",
+  syncUrl: "", syncToken: "",
 };
 
 interface AppState {
@@ -53,7 +54,10 @@ export const useStore = create<AppState>()(
       },
       act: <T,>(fn: (c: Chantier) => T): T => {
         let out: T | undefined;
-        set((s) => { const c = s.demo ?? s.chantier; if (c) out = fn(c as Chantier); });
+        set((s) => {
+          const c = s.demo ?? s.chantier;
+          if (c) { out = fn(c as Chantier); (c as Chantier).updatedAt = Date.now(); }
+        });
         return out as T;
       },
       setSettings: (p) => set((s) => { Object.assign(s.settings, p); }),

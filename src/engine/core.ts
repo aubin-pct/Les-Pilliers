@@ -11,7 +11,7 @@ export function freshChantier(now: number): Chantier {
   const p = {} as Chantier["p"];
   PILLAR_IDS.forEach((id) => (p[id] = { s: START_HEIGHT, last: now }));
   return {
-    v: 2, created: now, lastTick: now, lastDay: dayKey(now),
+    v: 2, created: now, updatedAt: now, lastTick: now, lastDay: dayKey(now),
     p, days: {}, pending: [], excuses: [], seances: [], seanceStart: null, tests: [],
     missionLevel: 0, missions: [], missionLog: [], euros: 0, stake: null, stakesLost: 0, custom: null,
     concepts: [], esprit: [], orals: [], hist: [], wins: [], skips: 0, report: null,

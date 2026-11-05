@@ -638,3 +638,9 @@ input:focus, textarea:focus { border-color: var(--acc); box-shadow: 0 0 0 3px co
   .stamp { animation: none; opacity: 1; }
   .btn, .chip, .ktile, .floor, .stepper button, .rpe button, .gear { transition: none; }
 }
+
+/* Pastille de synchronisation (en-tête) */
+.sync-dot { width: 12px; height: 12px; border-radius: 50%; border: 0; padding: 0; background: var(--muted); box-shadow: 0 0 0 3px rgba(255, 255, 255, .04); flex: none; }
+.sync-dot.ok { background: var(--ok); box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 70%, transparent); }
+.sync-dot.syncing, .sync-dot.idle { background: var(--brass); animation: pulse 1s ease-in-out infinite; }
+.sync-dot.error, .sync-dot.choice { background: var(--blood); box-shadow: 0 0 8px var(--blood); }

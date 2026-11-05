@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { MISS_PENALTY } from "@/content/pillars";
 import { buzz } from "@/lib/device";
 import { useStore } from "@/store";
@@ -26,7 +27,7 @@ export function Contract() {
         <HoldButton block ms={1400} label="Maintenir pour signer" hint="Tu t'engages" onConfirm={() => { sign(); buzz(80); toast("Contrat signé. Pose ta première pierre."); }} />
         <button className="btn ghost block" type="button" onClick={startDemo}>Voir 47 jours de démo</button>
       </div>
-      <p className="muted small" style={{ textAlign: "center" }}>Tes données restent sur ce téléphone.</p>
+      <p className="muted small" style={{ textAlign: "center" }}>Déjà un chantier sur ton autre appareil ? <Link to="/reglages" className="linkish">Relie celui-ci à ton serveur</Link>.</p>
     </div>
   );
 }

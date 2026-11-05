@@ -17,6 +17,15 @@ Application web installable (PWA) en React + TypeScript. Tes données restent su
 
 L'accueil te demande ta clé DeepSeek puis ton profil (corps, capital, esprit, verbe) : tout ce que l'appli te propose est construit par l'IA à partir de ce profil, de tes résultats et de sa mémoire de toi. Le profil se modifie à tout moment (réglages → Modifier mon profil).
 
+## Synchroniser le Mac et le téléphone
+
+Un conteneur Docker sur le Mac (serveur de synchronisation + appli) relie tes appareils, en HTTPS via Tailscale. Guide pas à pas : [docs/synchronisation.md](docs/synchronisation.md).
+
+```bash
+cp .env.example .env      # clé Tailscale + jeton de synchronisation
+docker compose up -d --build
+```
+
 ## Développer
 
 ```bash

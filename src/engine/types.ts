@@ -140,6 +140,8 @@ export interface Win { ts: number; pillar: PillarId; text: string }
 export interface Chantier {
   v: 2;
   created: number;
+  /** Dernière modification par l'utilisateur (pas l'érosion) : sert à savoir s'il y a quelque chose à synchroniser. */
+  updatedAt: number;
   lastTick: number;
   lastDay: string;
   p: Record<PillarId, PillarState>;
@@ -184,4 +186,7 @@ export interface Settings {
   deep: boolean;
   oralMode: "micro" | "clavier";
   lastBackup: string;
+  /** Serveur de synchronisation (Docker sur le Mac), vide = pas de synchronisation. */
+  syncUrl: string;
+  syncToken: string;
 }

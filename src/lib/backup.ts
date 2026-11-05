@@ -38,6 +38,11 @@ export async function exportBackup() {
 export async function readBackup(file: File): Promise<Backup> {
   let d: Partial<Backup> & { app?: string };
   try { d = JSON.parse(await file.text()); } catch { throw new Error("Fichier illisible. Choisis un export des Piliers."); }
+  // Sauvegarde du serveur de synchronisation (data/backups/state-AAAA-MM-JJ.json) : { rev, savedAt, state, shared }.
+  const server = d as unknown as { rev?: number; savedAt?: number; state?: Chantier };
+  if (server && typeof server.rev === "number" && server.state && !d.app) {
+    d = { app: "les-piliers", version: "serveur", exported: server.savedAt ?? Date.now(), settings: {} as Backup["settings"], state: server.state };
+  }
   if (!d || (d.app !== "les-piliers" && d.app !== "quatre-piliers") || !d.state || ![1, 2].includes((d.state as { v?: number }).v ?? 0)) throw new Error("Ce fichier n'est pas une sauvegarde des Piliers.");
   return { ...(d as Backup), state: normalize(d.state) };
 }

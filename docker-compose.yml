@@ -1,0 +1,33 @@
+# Les Piliers sur ton Mac : serveur de synchronisation + appli, joignable en HTTPS par ton téléphone via Tailscale.
+#   cp .env.example .env   (remplis TS_AUTHKEY et SYNC_TOKEN)
+#   docker compose up -d --build
+# Sur le Mac : http://localhost:8787   ·   Partout (Tailscale actif) : https://piliers.<ton-tailnet>.ts.net
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: piliers
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?Renseigne TS_AUTHKEY dans .env}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/serve.json
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./docker/tailscale:/config:ro
+    ports:
+      - "127.0.0.1:8787:8787" # accès direct depuis le Mac uniquement
+    restart: unless-stopped
+
+  piliers:
+    build: .
+    network_mode: service:tailscale # partage le réseau du conteneur Tailscale
+    depends_on: [tailscale]
+    environment:
+      SYNC_TOKEN: ${SYNC_TOKEN:?Renseigne SYNC_TOKEN dans .env}
+      ALLOWED_ORIGINS: https://aubin-pct.github.io,http://localhost:8787
+    volumes:
+      - ./data:/data # chantier, sauvegardes quotidiennes, médias : visibles dans le dossier data/
+    restart: unless-stopped
+
+volumes:
+  tailscale-state:

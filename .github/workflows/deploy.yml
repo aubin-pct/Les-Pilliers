@@ -31,8 +31,23 @@ jobs:
         with:
           path: dist
 
+  docker:
+    # Vérifie que l'image Docker du serveur de synchronisation se construit et démarre.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t les-piliers .
+      - name: Démarrage et réponse de l'API
+        run: |
+          docker run -d --name piliers -p 8787:8787 -e SYNC_TOKEN=ci-0123456789abcdef0123456789 les-piliers
+          for i in $(seq 1 20); do curl -fsS http://localhost:8787/api/health && break; sleep 1; done
+          curl -fsS http://localhost:8787/ | grep -q "Les Piliers"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/api/state)" = "401"
+          curl -fsS -H "Authorization: Bearer ci-0123456789abcdef0123456789" http://localhost:8787/api/state
+          docker logs piliers
+
   deploy:
-    needs: build
+    needs: [build, docker]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

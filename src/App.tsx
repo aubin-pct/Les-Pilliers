@@ -5,6 +5,7 @@ import { daysSinceStart, doneToday } from "@/engine/core";
 import { pad } from "@/lib/format";
 import { buzz, reacquireWake } from "@/lib/device";
 import { Stamp } from "@/ui/motion";
+import { startAutoSync, useSync } from "@/lib/sync";
 import { aiEnabled, useChantier, useIsDemo, useSettings, useStore } from "@/store";
 import { toast } from "@/store/ui";
 import { Toast, useNow } from "@/ui/kit";
@@ -55,6 +56,7 @@ function Header() {
       <div className="wrap">
         <div className="mark">Les Piliers<small>{demo ? "DÉMO · RIEN N'EST ENREGISTRÉ" : "LE CHANTIER D'UNE VIE"}</small></div>
         <div className="top-right">
+          <SyncDot />
           <span className={"pill " + pill.k}>{pill.t}</span>
           <div>
             <div className="jday num">{c ? `J+${daysSinceStart(c, now)}` : "J0"}</div>
@@ -67,6 +69,15 @@ function Header() {
       </div>
     </header>
   );
+}
+
+/** Pastille de synchronisation : verte à jour, laiton en cours, rouge en erreur ou en attente d'un choix. */
+function SyncDot() {
+  const st = useSync((s) => s.status);
+  const nav = useNavigate();
+  if (st.kind === "off") return null;
+  const label = st.kind === "ok" ? "Synchronisé" : st.kind === "syncing" || st.kind === "idle" ? "Synchronisation…" : st.kind === "choice" ? "Synchronisation : choix à faire" : `Synchronisation en échec : ${st.kind === "error" ? st.message : ""}`;
+  return <button type="button" className={"sync-dot " + st.kind} title={label} aria-label={label} onClick={() => nav("/reglages")} />;
 }
 
 const TempleGlyph = () => (
@@ -118,6 +129,7 @@ function ScrollTop() {
 export function App() {
   useEngineClock();
   useAccent();
+  useEffect(() => startAutoSync(), []);
   const c = useChantier();
   const demo = useIsDemo();
   const nav = useNavigate();

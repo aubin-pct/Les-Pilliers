@@ -11,6 +11,7 @@ import { aiEnabled, useChantier, useIsDemo, useSettings, useStore } from "@/stor
 import { toast } from "@/store/ui";
 import { Card, Foreman, Sheet, Thinking } from "@/ui/kit";
 import { HoldButton } from "@/ui/HoldButton";
+import { SyncCard } from "./SyncCard";
 
 export function ReglagesView() {
   const settings = useSettings();
@@ -53,6 +54,8 @@ export function ReglagesView() {
           <div><button className="btn" type="button" onClick={() => nav("/profil")}>Modifier mon profil</button></div>
         </Card>
       )}
+
+      <SyncCard />
 
       <Card title="Contremaître IA" aside={<span className={"pill " + (aiEnabled(settings) ? "on" : "")}>{aiEnabled(settings) ? "Branché" : "Débranché"}</span>}>
         <label className="f" htmlFor="s-key">Clé API DeepSeek
