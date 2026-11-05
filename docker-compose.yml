@@ -3,6 +3,21 @@
 #   docker compose up -d --build
 # Sur le Mac : http://localhost:8787   ·   Partout (Tailscale actif) : https://piliers.<ton-tailnet>.ts.net
 services:
+  piliers:
+    build: .
+    environment:
+      SYNC_TOKEN: ${SYNC_TOKEN:?Renseigne SYNC_TOKEN dans .env}
+      # Adresses d'où l'appli peut joindre ce serveur (le jeton reste exigé) : GitHub Pages, le conteneur, npm run dev / preview.
+      ALLOWED_ORIGINS: https://aubin-pct.github.io,http://localhost:8787,http://localhost:5173,http://localhost:4173
+    ports:
+      - "127.0.0.1:8787:8787" # accès direct depuis le Mac uniquement, même si Tailscale est en panne
+    volumes:
+      - ./data:/data # chantier, sauvegardes quotidiennes, médias : visibles dans le dossier data/
+    networks:
+      default:
+        aliases: [piliers-app] # nom joint par Tailscale (serve.json) ; « piliers » désigne le conteneur Tailscale lui-même
+    restart: unless-stopped
+
   tailscale:
     image: tailscale/tailscale:stable
     hostname: piliers
@@ -14,19 +29,7 @@ services:
     volumes:
       - tailscale-state:/var/lib/tailscale
       - ./docker/tailscale:/config:ro
-    ports:
-      - "127.0.0.1:8787:8787" # accès direct depuis le Mac uniquement
-    restart: unless-stopped
-
-  piliers:
-    build: .
-    network_mode: service:tailscale # partage le réseau du conteneur Tailscale
-    depends_on: [tailscale]
-    environment:
-      SYNC_TOKEN: ${SYNC_TOKEN:?Renseigne SYNC_TOKEN dans .env}
-      ALLOWED_ORIGINS: https://aubin-pct.github.io,http://localhost:8787
-    volumes:
-      - ./data:/data # chantier, sauvegardes quotidiennes, médias : visibles dans le dossier data/
+    depends_on: [piliers]
     restart: unless-stopped
 
 volumes:
