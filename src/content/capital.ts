@@ -45,3 +45,6 @@ export const CONCEPTS: ConceptDef[] = [
   { name: "Le revenu récurrent", theme: "business" },
   { name: "La facture : mentions obligatoires", theme: "droit" },
 ];
+
+/** Étapes de l'entonnoir de prospects. */
+export const STAGES = ["Contacté", "A répondu", "Rendez-vous", "Devis", "Payé"];

@@ -10,7 +10,7 @@ import { CapitalForm, CorpsForm, EspritForm, VerbeForm } from "./ProfileForms";
 import { PLAN_LABELS, runPlan, type PlanKey } from "./planner";
 
 type Tab = "corps" | "capital" | "esprit" | "verbe";
-const REGEN: Record<Tab, PlanKey[]> = { corps: ["programme"], capital: ["roadmap"], esprit: ["esprit"], verbe: ["verbe"] };
+const REGEN: Record<Tab, PlanKey[]> = { corps: ["programme"], capital: [], esprit: ["carte", "esprit"], verbe: [] };
 
 export function ProfilView() {
   const c = useChantier()!;

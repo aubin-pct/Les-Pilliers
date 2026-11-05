@@ -8,7 +8,7 @@ import { useChantier, useSettings, useStore } from "@/store";
 import { Foreman, Thinking } from "@/ui/kit";
 import { TextField } from "@/ui/fields";
 import { CapitalForm, CorpsForm, EspritForm, VerbeForm } from "./ProfileForms";
-import { PLAN_LABELS, runPlan, type PlanKey } from "./planner";
+import { ALL_PLANS, PLAN_LABELS, runPlan, type PlanKey } from "./planner";
 
 const STEPS = ["Contremaître", "Corps", "Capital", "Esprit", "Verbe", "Préparation"] as const;
 
@@ -39,7 +39,7 @@ export function Onboarding() {
     act((d) => { d.profile = { ...p, updated: 0 }; });
     next();
     if (!useStore.getState().settings.apiKey.trim()) return;
-    const keys: PlanKey[] = ["programme", "roadmap", "esprit", "verbe"];
+    const keys: PlanKey[] = ALL_PLANS;
     setPlans(Object.fromEntries(keys.map((k) => [k, "run"])));
     await Promise.all(keys.map(async (k) => { const ok = await runPlan(k); setPlans((x) => ({ ...x, [k]: ok ? "ok" : "ko" })); }));
   };

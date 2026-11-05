@@ -9,11 +9,11 @@
 import type { z } from "zod";
 import { useStore } from "@/store";
 import { toast } from "@/store/ui";
-import type { Chantier, PillarId } from "@/engine/types";
+import type { Chantier, ChatMsg, ChatScope, PillarId } from "@/engine/types";
 import { AIError, callModel, type CallOptions } from "./client";
 import * as P from "./prompts";
 import * as S from "./schemas";
-import { capitalContext, corpsContext, espritContext, excuseContext, pillarContext, verbeContext } from "./context";
+import { capitalContext, corpsContext, espritContext, excuseContext, pillarContext, scopeContext, templeContext, verbeContext } from "./context";
 
 export function aiReady() {
   const s = useStore.getState();
@@ -92,3 +92,24 @@ export async function testKey() {
   const r = S.TestKeySchema.safeParse(await callModel(useStore.getState().settings, P.testKeyPrompt, { max: 200 }));
   return (r.success && r.data.phrase) || "Au travail.";
 }
+
+/* ---------------- v5 : le Coach ---------------- */
+const SECTION: Record<ChatScope, string> = { temple: "Le Temple (vue d'ensemble)", corps: "Corps", capital: "Capital", esprit: "Esprit", verbe: "Verbe (éloquence)" };
+export const chat = (scope: ChatScope, actions: string, history: ChatMsg[], message: string) =>
+  ask(P.chatPrompt({ section: SECTION[scope], ctx: scopeContext(chantier()!, scope, now()), actions, history: history.slice(-12).map((m) => ({ from: m.from === "coach" ? "toi" : "lui", text: m.text })), message }), S.ChatSchema, { max: 700 });
+export const genBrief = () => {
+  const c = chantier()!, t = now();
+  return ask(P.briefPrompt({ ensemble: templeContext(c, t), corps: corpsContext(c, t), capital: capitalContext(c, t), esprit: espritContext(c, t), verbe: verbeContext(c, t) }), S.BriefSchema, { max: 500 }, true);
+};
+
+/* ---------------- v5 : Capital ---------------- */
+export const interviewNext = (qa: { q: string; a: string }[]) => ask(P.interviewPrompt(capitalContext(chantier()!, now()), qa), S.InterviewSchema, { max: 400 });
+export const genOptions = (demande = "") => ask(P.optionsPrompt(capitalContext(chantier()!, now()), demande), S.OptionsSchema, { deep: true, max: 2500 });
+export const genSprint = () => ask(P.sprintPrompt(capitalContext(chantier()!, now())), S.SprintSchema, { max: 1000 });
+
+/* ---------------- v5 : Esprit ---------------- */
+export const genMap = () => ask(P.mapPrompt(espritContext(chantier()!, now())), S.MapSchema, { deep: true, max: 3000 });
+
+/* ---------------- v5 : Verbe ---------------- */
+export const genDrill = (type: string, description: string, silent = false) => ask(P.drillPrompt(verbeContext(chantier()!, now()), type, description), S.DrillContentSchema, { max: 700 }, silent);
+export const coachOral2 = (p: Parameters<typeof P.oral2Prompt>[1]) => ask(P.oral2Prompt(verbeContext(chantier()!, now()), p), S.OralCoach2Schema, { max: 600 });

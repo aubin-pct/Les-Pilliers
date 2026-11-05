@@ -16,7 +16,7 @@ import { beep, buzz, keepAwake } from "@/lib/device";
 import { dayKey, fmtDur } from "@/lib/format";
 import { useStore } from "@/store";
 import { gainToast, toast } from "@/store/ui";
-import { Card, Foreman, Thinking } from "@/ui/kit";
+import { Card, Fold, Thinking } from "@/ui/kit";
 import { Chips, Segmented } from "@/ui/fields";
 
 const ENERGY = [{ id: "basse", label: "Basse" }, { id: "normale", label: "Normale" }, { id: "haute", label: "Haute" }];
@@ -32,25 +32,30 @@ export function SessionCard({ c, now }: { c: Chantier; now: number }) {
   if (done.length && !running) {
     const s = done[done.length - 1];
     return (
-      <Card title="Séance du jour" aside={<span className="tag">posé</span>}>
-        <p><b style={{ color: "var(--ok)" }}>Posé.</b> <span className="muted">{s.type} · {s.timed ? `${s.dur} min · ` : ""}{s.done}/{s.total} séries{s.rpe ? ` · effort ${s.rpe}/10` : ""}.</span></p>
-        <p className="muted small">La prochaine séance tiendra compte de ce que tu viens de faire. Un test étalon te ferait monter plus vite que la routine.</p>
+      <Card title="Séance du jour" aside={<span className="tag ok">posé</span>}>
+        <p className="h-display" style={{ fontSize: 24 }}>{s.type}</p>
+        <div className="kpis">
+          <div><b className="num">{s.timed ? s.dur : "—"}</b><span>min</span></div>
+          <div><b className="num">{s.done}/{s.total}</b><span>séries</span></div>
+          <div><b className="num">{s.rpe ?? "—"}</b><span>effort</span></div>
+        </div>
       </Card>
     );
   }
   if (!plan || adjusting) return <Prepare c={c} now={now} onDone={() => setAdjusting(false)} canCancel={!!plan} />;
   if (!running) {
     return (
-      <Card title="Séance du jour" aside={<span className="tag">{plan.titre}</span>}>
+      <Card title="Séance du jour" aside={<span className="tag">prête</span>}>
+        <p className="h-display" style={{ fontSize: 26 }}>{plan.titre}</p>
         <PlanView plan={plan} />
         <div className="btn-row">
           <button className="btn primary" type="button" onClick={() => { act((d) => { d.seanceStart = Date.now(); if (d.plans.seance) d.plans.seance.faits = d.plans.seance.exos.map((e) => Array(e.series).fill(null)); }); buzz(40); }}>Démarrer la séance</button>
-          <button className="btn ghost" type="button" onClick={() => setAdjusting(true)}>Changer les conditions</button>
+          <button className="btn ghost" type="button" onClick={() => setAdjusting(true)}>Changer</button>
         </div>
-        <button className="linkish" type="button" onClick={() => {
+        <button className="linkish small" type="button" onClick={() => {
           const r = act((d) => { d.seances.push({ ts: Date.now(), type: plan.titre, dur: 0, done: 0, total: 0, proof: "", timed: false }); return gain(d, "corps", POINTS.seanceSansChrono, Date.now()); });
           gainToast("corps", r, "sans chrono, presque rien");
-        }}>J'ai fait ma séance sans l'appli</button>
+        }}>Faite sans l'appli (+1)</button>
       </Card>
     );
   }
@@ -77,19 +82,20 @@ function Prepare({ c, now, onDone, canCancel }: { c: Chantier; now: number; onDo
   };
   return (
     <Card title="Séance du jour" aside="à préparer">
-      {day && <p className="planned"><span className="eyebrow">Prévu aujourd'hui</span><b>{day.focus}</b></p>}
-      <p className="muted small">Dis au Contremaître dans quel état tu es. Il construit la séance à partir de ton programme, de tes dernières séances et de tes records.</p>
-      <Segmented label="Temps disponible (minutes)" value={minutes} options={durations} onChange={setMinutes} />
+      {day && <p className="planned"><span className="eyebrow">Prévu</span><b>{day.focus}</b></p>}
+      <Segmented label="Minutes" value={minutes} options={durations} onChange={setMinutes} />
       <Segmented label="Énergie" value={energie} options={ENERGY} onChange={setEnergie} />
-      <Chips label="Matériel disponible aujourd'hui" options={EQUIPMENT.slice(0, 7)} value={materiel} onChange={setMateriel} allowCustom />
-      <label className="f" htmlFor="sp-pain">Douleur ou gêne (facultatif)<input id="sp-pain" type="text" value={douleur} onChange={(e) => setDouleur(e.target.value)} placeholder="Ex. : épaule gauche, bas du dos" /></label>
-      <label className="f" htmlFor="sp-ask">Une envie, une contrainte (facultatif)<input id="sp-ask" type="text" value={demande} onChange={(e) => setDemande(e.target.value)} placeholder="Ex. : je suis à l'hôtel, pas de bruit ; je veux insister sur les tractions" /></label>
+      <Fold title="Matériel, douleur, envie">
+        <Chips options={EQUIPMENT.slice(0, 7)} value={materiel} onChange={setMateriel} allowCustom />
+        <label className="f" htmlFor="sp-pain">Douleur<input id="sp-pain" type="text" value={douleur} onChange={(e) => setDouleur(e.target.value)} placeholder="Ex. : épaule gauche" /></label>
+        <label className="f" htmlFor="sp-ask">Envie, contrainte<input id="sp-ask" type="text" value={demande} onChange={(e) => setDemande(e.target.value)} placeholder="Ex. : hôtel, pas de bruit" /></label>
+      </Fold>
       <div className="btn-row">
-        <button className="btn primary" type="button" disabled={busy} onClick={() => void go()}>Préparer ma séance</button>
-        {canCancel && <button className="btn ghost" type="button" onClick={onDone}>Garder la séance actuelle</button>}
+        <button className="btn primary" type="button" disabled={busy} onClick={() => void go()}>Construire ma séance</button>
+        {canCancel && <button className="btn ghost" type="button" onClick={onDone}>Annuler</button>}
       </div>
-      {busy && <Thinking>Le Contremaître construit ta séance</Thinking>}
-      {!busy && <button className="linkish" type="button" onClick={() => { act((d) => { d.plans.seance = fallbackSeance(d, Date.now()); }); onDone(); }}>Séance de secours, sans IA</button>}
+      {busy && <Thinking>Il construit ta séance</Thinking>}
+      {!busy && <button className="linkish small" type="button" onClick={() => { act((d) => { d.plans.seance = fallbackSeance(d, Date.now()); }); onDone(); }}>Séance de secours, sans IA</button>}
     </Card>
   );
 }
@@ -97,18 +103,17 @@ function Prepare({ c, now, onDone, canCancel }: { c: Chantier; now: number; onDo
 function PlanView({ plan }: { plan: SeancePlan }) {
   return (
     <>
-      <p className="h-display" style={{ fontSize: 26 }}>{plan.titre}</p>
-      <p className="muted small">{plan.focus} · environ {plan.duree} min</p>
-      {plan.pourquoi && <Foreman who="Pourquoi cette séance"><p className="voice">{plan.pourquoi}{plan.ajustement ? `\n${plan.ajustement}` : ""}</p></Foreman>}
-      <p className="small"><b>Échauffement.</b> <span className="muted">{plan.echauffement}</span></p>
-      <div>
+      <div className="kpis">
+        <div><b className="num">{plan.duree}</b><span>min</span></div>
+        <div><b className="num">{plan.exos.length}</b><span>exercices</span></div>
+        <div><b className="num">{plan.exos.reduce((a, e) => a + e.series, 0)}</b><span>séries</span></div>
+      </div>
+      <div className="exo-list">
         {plan.exos.map((e, i) => (
-          <div className="exo" key={i}>
-            <div className="exo-head"><b>{e.nom}</b><span className="meta">{e.series} × {e.cible}{e.type === "duree" ? " s" : ""}{e.charge ? ` · ${e.charge}` : ""} · repos {e.repos} s</span></div>
-            {e.consigne && <span className="muted small">{e.consigne}</span>}
-          </div>
+          <div className="exo-row" key={i}><span className="exo-n">{e.nom}</span><span className="exo-d num">{e.series}×{e.cible}{e.type === "duree" ? "s" : ""}</span></div>
         ))}
       </div>
+      {plan.pourquoi && <Fold title="Pourquoi cette séance"><p className="voice">{plan.pourquoi}{plan.ajustement ? `\n${plan.ajustement}` : ""}</p><p className="small muted">Échauffement : {plan.echauffement}</p></Fold>}
     </>
   );
 }
@@ -144,7 +149,7 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
       </div>
       <div className="bar" aria-hidden="true"><span style={{ width: `${total ? (done / total) * 100 : 0}%` }} /></div>
       <button className="btn primary block big" type="button" onClick={() => setFocus(true)}>Plein écran</button>
-      <p className="small"><b>Échauffement.</b> <span className="muted">{plan.echauffement}</span></p>
+      <Fold title="Saisie en liste">
       <div>
         {plan.exos.map((e, i) => (
           <div className="exo" key={i}>
@@ -161,14 +166,13 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
           </div>
         ))}
       </div>
-      {plan.retourAuCalme && <p className="small"><b>Retour au calme.</b> <span className="muted">{plan.retourAuCalme}</span></p>}
-      <hr className="sep" />
-      <span className="muted small">Effort ressenti (1 = facile, 10 = à fond)</span>
+      </Fold>
+      <span className="muted small">Effort ressenti, 1 à 10</span>
       <div className="rpe">{Array.from({ length: 10 }, (_, k) => k + 1).map((n) => <button key={n} type="button" aria-pressed={rpe === n} onClick={() => { setRpe(n); buzz(10); }}>{n}</button>)}</div>
-      <label className="f" htmlFor="se-note">Sensations, douleurs (facultatif)<input id="se-note" type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex. : épaule qui tire sur les dips" /></label>
+      <input id="se-note" aria-label="Sensations" type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Sensations, douleurs (facultatif)" />
       <HoldButton block label="Valider la séance" onConfirm={() => { const err = finishSession(rpe, note); if (err) toast(err); }} />
       <div className="btn-row spread">
-        <p className="muted small">Validation après 5 minutes de chrono et la moitié des séries.</p>
+        <p className="muted small">5 min et ½ des séries minimum.</p>
         <button className="linkish" type="button" onClick={() => act((d) => { d.seanceStart = null; })}>Abandonner</button>
       </div>
       {rest && <div className="rest" role="status">Repos · {rest.nom} <b className="num">{Math.max(0, left)}</b><button className="btn small ghost" type="button" onClick={() => setRest(null)}>Passer</button></div>}

@@ -8,7 +8,7 @@ import { aiReady, genMemoire } from "@/ai/contremaitre";
 import type { Chantier, PillarId } from "@/engine/types";
 import { DAY, fdate } from "@/lib/format";
 import { useStore } from "@/store";
-import { Card, Thinking } from "@/ui/kit";
+import { Thinking } from "@/ui/kit";
 
 /** Nombre de preuves enregistrées sur un pilier depuis une date. */
 export function proofsSince(c: Chantier, id: PillarId, ts: number) {
@@ -34,10 +34,10 @@ export async function refreshMemory(id: PillarId, silent = false) {
 }
 
 /** Rafraîchit en arrière-plan, un pilier à la fois, les mémoires périmées. */
-export function useAutoMemory(c: Chantier) {
+export function useAutoMemory(c: Chantier | null) {
   const running = useRef(false);
   useEffect(() => {
-    if (running.current || !aiReady()) return;
+    if (!c || running.current || !aiReady()) return;
     const todo = PILLAR_IDS.filter((id) => stale(c, id, Date.now()) && Date.now() - (lastTry[id] ?? 0) > 3600e3);
     if (!todo.length) return;
     running.current = true;
@@ -47,11 +47,9 @@ export function useAutoMemory(c: Chantier) {
 
 export function MemoryCard({ c }: { c: Chantier }) {
   const [busy, setBusy] = useState(false);
-  useAutoMemory(c);
   const all = async () => { setBusy(true); for (const id of PILLAR_IDS) await refreshMemory(id); setBusy(false); };
   return (
-    <Card title="Mémoire du Contremaître" aside="sa lecture de toi">
-      <p className="muted small">Ce que le Contremaître retient de tes données. Tout ce qu'il te propose part de là. Mise à jour chaque semaine.</p>
+    <>
       <div>
         {PILLAR_IDS.map((id) => {
           const m = c.memoire[id];
@@ -63,14 +61,14 @@ export function MemoryCard({ c }: { c: Chantier }) {
                   <span className="p">{m.synthese}</span>
                   <span className="p"><b>Priorité :</b> {m.priorite}</span>
                 </>
-              ) : <span className="p muted">Pas encore assez de preuves (3 minimum).</span>}
+              ) : <span className="p muted">3 preuves minimum.</span>}
             </div>
           );
         })}
       </div>
-      <div className="btn-row"><button className="btn" type="button" disabled={busy} onClick={() => void all()}>Faire le bilan maintenant</button></div>
-      {busy && <Thinking>Le Contremaître relit tes quatre piliers</Thinking>}
-    </Card>
+      <div className="btn-row"><button className="btn small" type="button" disabled={busy} onClick={() => void all()}>Refaire le bilan</button></div>
+      {busy && <Thinking>Il relit tes quatre piliers</Thinking>}
+    </>
   );
 }
 

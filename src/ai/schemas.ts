@@ -71,3 +71,34 @@ export const MemoireSchema = z.object({
   synthese: txt(500), forces: list(txt(160), 0, 4).catch([]), faiblesses: list(txt(160), 0, 4).catch([]), priorite: txt(240),
 });
 export const TestKeySchema = z.object({ phrase: opt(120) });
+
+/* ---- v5 : le Coach ---- */
+export const ActionSchema = z.object({ label: txt(28), type: txt(30), params: z.record(z.unknown()).catch({}).default({}) });
+export const ChatSchema = z.object({ reponse: txt(700), actions: z.array(ActionSchema).catch([]).default([]).transform((a) => a.slice(0, 3)) });
+export const BriefSchema = z.object({ temple: txt(120), corps: txt(120), capital: txt(120), esprit: txt(120), verbe: txt(120) });
+
+/* ---- v5 : Capital ---- */
+export const InterviewSchema = z.object({ question: opt(220), choix: z.array(txt(60)).catch([]).default([]).transform((a) => a.slice(0, 5)), fini: bool(false) });
+const score10 = int(1, 10, 5);
+export const BizOptionSchema = z.object({
+  nom: txt(60), offre: txt(240), cible: txt(160), canal: txt(160), prix: txt(80), pourquoiToi: txt(240),
+  premierEuroJours: int(1, 180, 21), potentielMois: int(0, 100000, 500),
+  scores: z.object({ marche: score10, competence: score10, vitesse: score10, echelle: score10 }),
+});
+export const OptionsSchema = z.object({ options: list(BizOptionSchema, 2, 3) });
+export const SprintSchema = z.object({
+  objectif: txt(160),
+  kpis: list(z.object({ label: txt(60), cible: int(1, 500, 5) }), 2, 5),
+  script: txt(700),
+});
+
+/* ---- v5 : Esprit ---- */
+export const MapSchema = z.object({
+  domaines: list(z.object({ nom: txt(40), sujets: list(z.object({ titre: txt(90), niveau: int(1, 3, 1) }), 4, 14) }), 1, 10),
+});
+
+/* ---- v5 : Verbe ---- */
+export const DrillContentSchema = z.object({ sujet: opt(200), texte: opt(900), question: opt(240), conseil: opt(160) });
+export const OralCoach2Schema = z.object({
+  structure: int(0, 100, 50), impact: int(0, 100, 50), verdict: txt(240), a_corriger: txt(200), phrase_refaite: opt(240),
+});

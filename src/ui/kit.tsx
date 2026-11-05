@@ -171,3 +171,38 @@ export function Toast() {
   if (!t) return null;
   return <div className={"toast" + (t.kind ? " " + t.kind : "")} role="status" aria-live="polite">{t.msg}</div>;
 }
+
+/** Section repliée : tout ce qui n'est pas l'action du jour. */
+export function Fold({ title, aside, children, open }: { title: ReactNode; aside?: ReactNode; children: ReactNode; open?: boolean }) {
+  return (
+    <details className="fold" open={open}>
+      <summary><span className="fold-t">{title}</span>{aside !== undefined && <span className="fold-a">{aside}</span>}<span className="fold-chev" aria-hidden="true" /></summary>
+      <div className="fold-body">{children}</div>
+    </details>
+  );
+}
+
+/** Jauge horizontale chiffrée. */
+export function Meter({ value, max, color, label, right }: { value: number; max: number; color?: string; label: ReactNode; right?: ReactNode }) {
+  const p = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  return (
+    <div className="meter2">
+      <div className="meter2-h"><span>{label}</span><b className="num">{right ?? `${value}/${max}`}</b></div>
+      <div className="meter2-b"><span style={{ width: `${p * 100}%`, background: color }} /></div>
+    </div>
+  );
+}
+
+/** Anneau de progression avec un nombre au centre. */
+export function Ring({ value, max, size = 120, color = "var(--acc)", children }: { value: number; max: number; size?: number; color?: string; children: ReactNode }) {
+  const r = 44, L = 2 * Math.PI * r, p = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  return (
+    <div className="ring" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r={r} className="ring-bg" />
+        <circle cx="50" cy="50" r={r} className="ring-fg" style={{ stroke: color }} strokeDasharray={`${(L * p).toFixed(1)} ${L.toFixed(1)}`} transform="rotate(-90 50 50)" />
+      </svg>
+      <div className="ring-c">{children}</div>
+    </div>
+  );
+}

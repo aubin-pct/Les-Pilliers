@@ -14,7 +14,7 @@ import type { Chantier, Settings } from "@/engine/types";
 
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: "", baseUrl: "https://api.deepseek.com", model: "deepseek-flash", deep: false, oralMode: "micro", lastBackup: "",
-  syncUrl: "", syncToken: "",
+  syncUrl: "", syncToken: "", voice: false,
 };
 
 interface AppState {

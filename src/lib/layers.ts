@@ -24,6 +24,9 @@ export function openLayer(close: () => void): () => void {
     const i = stack.findIndex((l) => l.id === id);
     if (i < 0) return; // déjà fermée par le retour
     stack.splice(i, 1);
+    // Si l'on a navigué pendant que la couche était ouverte (le Coach peut ouvrir une page), son entrée
+    // n'est plus en haut de l'historique : on la laisse, revenir en arrière annulerait la navigation.
+    if ((history.state as { layer?: number } | null)?.layer !== id) return;
     ignore++;
     history.back();
   };

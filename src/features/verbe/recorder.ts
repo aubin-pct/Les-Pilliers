@@ -3,6 +3,7 @@
  * et transcription en direct (SpeechRecognition, quand le navigateur l'offre). Indépendant de React.
  */
 import { FRAME } from "@/engine/analysis";
+import { detectPitch } from "@/engine/eloquence";
 
 type SR = {
   lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
@@ -17,11 +18,13 @@ export const hasSpeechRecognition = !!SRClass;
 
 export interface CaptureEvents {
   onLevel?: (rms: number) => void;
+  /** Chaque trame : niveau et hauteur de la voix (Hz, null si silence ou bruit). */
+  onFrame?: (rms: number, pitch: number | null) => void;
   onTranscript?: (finals: string, interim: string) => void;
   onRecognitionFailed?: () => void;
 }
 
-export interface CaptureResult { blob: Blob | null; rms: number[]; text: string; recognized: boolean }
+export interface CaptureResult { blob: Blob | null; rms: number[]; pitch: (number | null)[]; text: string; recognized: boolean }
 
 export class Capture {
   private stream: MediaStream | null = null;
@@ -33,6 +36,7 @@ export class Capture {
   private recog: SR | null = null;
   private running = false;
   rms: number[] = [];
+  pitch: (number | null)[] = [];
   finals = "";
   interim = "";
   recognized = false;
@@ -63,7 +67,8 @@ export class Capture {
         an.getFloatTimeDomainData(buf);
         let s = 0; for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
         const r = Math.sqrt(s / buf.length);
-        this.rms.push(r); this.ev.onLevel?.(r);
+        const f = r > 0.012 ? detectPitch(buf, this.ctx!.sampleRate) : null;
+        this.rms.push(r); this.pitch.push(f); this.ev.onLevel?.(r); this.ev.onFrame?.(r, f);
       }, FRAME * 1000);
     } catch { this.ctx = null; }
     if (SRClass) this.startRecognition();
@@ -110,7 +115,7 @@ export class Capture {
       try { rec.stop(); } catch { res(null); }
     });
     this.release();
-    return { blob, rms: this.rms, text: (this.finals + (this.interim ? " " + this.interim : "")).trim(), recognized: this.recognized };
+    return { blob, rms: this.rms, pitch: this.pitch, text: (this.finals + (this.interim ? " " + this.interim : "")).trim(), recognized: this.recognized };
   }
 
   /** Libère le micro sans rien garder (abandon). */

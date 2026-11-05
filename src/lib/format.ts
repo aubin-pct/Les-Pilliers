@@ -58,3 +58,12 @@ export function mulberry32(a: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/** Semaine ISO, « 2026-W45 ». */
+export function weekKey(ts: number) {
+  const d = new Date(ts); d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const w1 = new Date(d.getFullYear(), 0, 4);
+  const n = 1 + Math.round(((d.getTime() - w1.getTime()) / 864e5 - 3 + ((w1.getDay() + 6) % 7)) / 7);
+  return `${d.getFullYear()}-W${String(n).padStart(2, "0")}`;
+}

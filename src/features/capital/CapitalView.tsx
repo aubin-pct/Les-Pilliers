@@ -1,365 +1,396 @@
+/*
+ * Capital v5 : un vrai plan d'affaires, construit avec le Coach.
+ * 1. Diagnostic : le Coach interroge (atouts rares, réseau, temps, contraintes, ambition chiffrée).
+ * 2. Trois pistes chiffrées et notées, comparées d'un coup d'œil ; on en choisit une avec un objectif mensuel.
+ * 3. Chaque semaine : un sprint (objectif, indicateurs à cocher, message prêt à envoyer), un entonnoir de prospects,
+ *    des encaissements prouvés. Le concept du jour n'est plus qu'une carte, au service de la piste.
+ */
 import { useEffect, useRef, useState } from "react";
-import { doneToday, gain, win } from "@/engine/core";
-import { POINTS, advanceMission, currentMission, missionPoints } from "@/engine/scoring";
+import { STAGES } from "@/content/capital";
+import { gain, win } from "@/engine/core";
+import { POINTS, missionPoints } from "@/engine/scoring";
+import { monthCash } from "@/engine/coachLines";
 import { todayConcept } from "@/engine/insights";
-import { ladderRoadmap } from "@/engine/fallbacks";
-import { aiReady, examineConcept, genRoadmap, genSteps, pickConcept, replacePalier, unblock } from "@/ai/contremaitre";
-import { DAY, dayKey, f0, fdate, num, plural, wc } from "@/lib/format";
+import type { BizOption, Prospect } from "@/engine/types";
+import { aiReady, examineConcept, pickConcept } from "@/ai/contremaitre";
+import * as O from "@/ai/ops";
+import { dayKey, f0, fdate, num, plural, wc } from "@/lib/format";
 import { buzz } from "@/lib/device";
 import { saveProof, toJpeg } from "@/lib/media";
+import { canDictate, dictate, stopDictation, useVoice } from "@/lib/voice";
 import { useChantier, useIsDemo, useStore } from "@/store";
 import { gainToast, toast, useDraft } from "@/store/ui";
-import { Card, Foreman, PillarHeader, Thinking, useNow } from "@/ui/kit";
-import { MemoryNote } from "@/features/temple/Memory";
-import { ExamResult, type ExamView } from "@/features/esprit/ExamResult";
+import { openCoach } from "@/store/coach";
+import { Card, Fold, PillarHeader, Ring, Sheet, Thinking, useNow } from "@/ui/kit";
 import { HoldButton } from "@/ui/HoldButton";
+import { CoachHead } from "@/features/coach/CoachHead";
+import { ExamResult, type ExamView } from "@/features/esprit/ExamResult";
 import { ProofSheet } from "./ProofSheet";
 
 export function CapitalView() {
   const c = useChantier()!;
   const now = useNow(30_000);
-  const [showProof, setShowProof] = useState<string | null>(null);
+  const [proof, setProof] = useState<string | null>(null);
+  const [cash, setCash] = useState<{ open: boolean; prospect?: Prospect }>({ open: false });
+  const k = c.capital;
   return (
     <div className="view">
       <PillarHeader c={c} id="capital" now={now} />
-      <Card>
-        <div className="bigmoney">
-          <span className="k num">{f0(c.euros)} €</span>
-          <span className="l">gagnés de ton propre chef, hors salaire · {c.missions.length} {plural(c.missions.length, "mission")} {plural(c.missions.length, "livrée")}{c.stakesLost ? <> · <span className="down">{f0(c.stakesLost)} € de mises perdues</span></> : null}</span>
-        </div>
-        <p className="muted small">Le seul chiffre honnête. Obéir à un patron ne compte pas ici. Ce qui compte, c'est l'argent que tu crées en te donnant toi-même les ordres.</p>
-      </Card>
-      <MemoryNote c={c} id="capital" />
-      <MissionCard now={now} />
-      <ConceptCard now={now} />
-      <RoadmapCard onProof={setShowProof} />
-      <ProofSheet id={showProof} onClose={() => setShowProof(null)} />
+      <CoachHead scope="capital" />
+      {!k.thesis ? (k.options && k.diagDone ? <Options /> : <Diagnostic />) : (
+        <>
+          <CashHero now={now} onCash={() => setCash({ open: true })} />
+          <SprintCard now={now} />
+          <Funnel onPaid={(p) => setCash({ open: true, prospect: p })} />
+          <ConceptRow now={now} />
+          <Fold title={"Ma piste · " + k.thesis.option.nom} aside={fdate(k.thesis.ts)}>
+            <OptionDetail o={k.thesis.option} />
+            <button className="linkish small" type="button" onClick={() => useStore.getState().act((d) => { d.capital.thesis = null; d.capital.sprint = null; })}>Changer de piste</button>
+          </Fold>
+        </>
+      )}
+      {(c.missions.length > 0 || c.euros > 0) && (
+        <Fold title="Encaissements" aside={`${f0(c.euros)} €`}>
+          <div className="list">
+            {c.missions.slice(-12).reverse().map((m) => (
+              <div className="li" key={m.ts}>
+                <span className="main">{m.title}</span><span className="side num">{f0(m.amount)} €</span>
+                <span className="sub">{fdate(m.ts)}{m.photo && <> · <button className="linkish" type="button" onClick={() => setProof(m.photo!)}>preuve</button></>}</span>
+              </div>
+            ))}
+          </div>
+        </Fold>
+      )}
+      <CashSheet open={cash.open} prospect={cash.prospect} onClose={() => setCash({ open: false })} />
+      <ProofSheet id={proof} onClose={() => setProof(null)} />
     </div>
   );
 }
 
-/* ---------------- Mission en cours ---------------- */
+/* ---------------- 1. Diagnostic ---------------- */
 
-function MissionCard({ now }: { now: number }) {
+function Diagnostic() {
   const c = useChantier()!;
-  const demo = useIsDemo();
-  const act = useStore((s) => s.act);
-  const M = currentMission(c);
-  const stake = c.stake, left = stake ? stake.deadline - now : 0;
-  const logToday = c.missionLog.filter((l) => dayKey(l.ts) === dayKey(now) && !l.text.startsWith("Blocage"));
-  const floorDone = doneToday(c, "capital", now);
-  const steps = c.missionSteps?.palier === M.title ? c.missionSteps : null;
+  const k = c.capital;
+  const [ans, setAns] = useState("");
+  const [busy, setBusy] = useState<"" | "q" | "opt">("");
+  const listening = useVoice((s) => s.listening);
+  const tried = useRef(false);
+  const step = async (a?: string) => { stopDictation(); setBusy("q"); await O.interviewStep(a); setBusy(""); setAns(""); };
+  const options = async () => { setBusy("opt"); await O.makeOptions(); setBusy(""); };
+  // Diagnostic terminé sans pistes (ou pistes perdues) : on les construit.
+  useEffect(() => { if (k.diagDone && !k.options && aiReady() && !tried.current) { tried.current = true; void options(); } }, [k.diagDone, k.options]);
 
-  const [logText, setLogText, clearLog] = useDraft("cap-log");
-  const [proofText, setProofText, clearProofText] = useDraft("cap-proof");
-  const [amount, setAmount, clearAmount] = useDraft("cap-amount");
-  const [photo, setPhoto] = useState<{ full: string; thumb: string } | null>(null);
-  const [panel, setPanel] = useState<"" | "bloque" | "changer" | "mise">("");
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState<"" | "steps" | "bloque" | "changer">("");
-  const [coach, setCoach] = useState<{ diagnostic: string; action: string; phrase: string } | null>(null);
-  const [stakeAmt, setStakeAmt] = useState("20");
-  const [stakeDays, setStakeDays] = useState(String(Math.max(2, Math.min(30, M.jours))));
-  const fileRef = useRef<HTMLInputElement>(null);
-  const tried = useRef("");
-
-  // Plan d'attaque : généré automatiquement à l'ouverture d'une nouvelle mission.
-  useEffect(() => {
-    if (M.done || steps || !aiReady() || tried.current === M.title) return;
-    tried.current = M.title;
-    void makeSteps();
-  }, [M.title]);
-
-  async function makeSteps() {
-    setBusy("steps");
-    const r = await genSteps();
-    setBusy("");
-    if (r) act((d) => { d.missionSteps = { palier: M.title, ts: Date.now(), items: r.etapes.map((t) => ({ t, done: false })) }; });
+  if (busy === "opt" || (k.diagDone && !k.options)) {
+    return <Card title="Tes pistes"><Thinking>Il construit 3 pistes à partir de tes réponses</Thinking>{!busy && <button className="btn" type="button" onClick={() => void options()}>Construire mes pistes</button>}</Card>;
   }
-
-  const logAction = (t: string) => {
-    const r = act((d) => {
-      d.missionLog.push({ ts: Date.now(), text: t });
-      if (d.missionLog.length > 400) d.missionLog = d.missionLog.slice(-400);
-      return gain(d, "capital", POINTS.missionAction, Date.now());
-    });
-    gainToast("capital", r);
-  };
-  const toggleStep = (i: number) => {
-    if (!steps) return;
-    const was = steps.items[i].done;
-    act((d) => { if (d.missionSteps) d.missionSteps.items[i].done = !was; });
-    if (!was) logAction(`Étape faite : ${steps.items[i].t}`);
-  };
-
-  const askUnblock = async () => {
-    if (text.trim().length < 10) { toast("Décris ton blocage en une phrase au moins."); return; }
-    setBusy("bloque");
-    const r = await unblock(text.trim());
-    setBusy("");
-    if (r) { setCoach(r); act((d) => { d.missionLog.push({ ts: Date.now(), text: `Blocage : ${text.trim()} → ${r.action}` }); }); setText(""); }
-  };
-  const askChange = async () => {
-    if (text.trim().length < 10) { toast("Donne une vraie raison."); return; }
-    setBusy("changer");
-    const r = await replacePalier(text.trim());
-    setBusy("");
-    if (r) {
-      act((d) => {
-        if (!d.roadmap) d.roadmap = ladderRoadmap(d.missionLevel);
-        d.roadmap.paliers[Math.min(d.roadmap.index, d.roadmap.paliers.length - 1)] = r;
-        d.missionSteps = null; d.custom = null;
-      });
-      tried.current = ""; setText(""); setPanel(""); toast("Mission remplacée.");
-    }
-  };
-
-  const onPhoto = async (f: File | undefined) => {
-    if (!f) return;
-    try { setPhoto({ full: await toJpeg(f, 1100, 0.78), thumb: await toJpeg(f, 200, 0.7) }); }
-    catch { toast("Photo illisible. Essaie une autre image."); }
-  };
-  const deliver = async () => {
-    const proof = proofText.trim(), amt = num(amount || "0");
-    if (proof.length < 20) { toast("La preuve doit être précise : quoi, à qui, comment."); return; }
-    if (!Number.isFinite(amt) || amt < 0) { toast("Montant invalide."); return; }
-    if (M.cash && amt <= 0) { toast("Cette mission exige un montant encaissé."); return; }
-    if (!photo && !demo) { toast("Sans photo de la preuve, rien ne compte."); return; }
-    const ts = Date.now();
-    let photoId: string | null = null;
-    if (photo && !demo) { photoId = "m-" + ts; try { await saveProof(photoId, photo.full); } catch { photoId = null; } }
-    let extra = "";
-    const r = act((d) => {
-      d.missions.push({ ts, level: M.custom ? -1 : M.index, title: M.title, proof, amount: amt, photo: photoId });
-      d.euros += amt;
-      if (d.stake) { extra = `mise de ${f0(d.stake.amount)} € récupérée`; d.stake = null; }
-      advanceMission(d);
-      win(d, "capital", `${M.title}${amt ? ` : ${f0(amt)} €` : ""}`, ts);
-      return gain(d, "capital", missionPoints(M.index, amt, M.custom), ts);
-    });
-    setPhoto(null); clearProofText(); clearAmount(); tried.current = "";
-    gainToast("capital", r, extra); buzz([60, 40, 120]);
-  };
-  const engage = () => {
-    const a = num(stakeAmt), d = num(stakeDays);
-    if (!(a >= 5) || !(d >= 2)) { toast("Cinq euros et deux jours minimum."); return; }
-    act((x) => { x.stake = { amount: Math.round(a), level: M.index, title: M.title, set: Date.now(), deadline: Date.now() + Math.round(d) * DAY }; });
-    setPanel(""); toast(`${f0(a)} € engagés. Tic-tac.`, "loss"); buzz([100, 60, 100]);
-  };
-
-  if (M.done) {
+  if (!k.ask) {
     return (
-      <Card title="Mission en cours" aside={<span className="tag">feuille de route terminée</span>}>
-        <p className="h-display" style={{ fontSize: 28 }}>Feuille de route gravie.</p>
-        <p className="muted">Demande au Contremaître la suivante, plus haute (carte « Feuille de route » plus bas).</p>
+      <Card title="Diagnostic" className="hero-card">
+        <div className="steps3">
+          <div><b>1</b><span>8 questions</span></div><div><b>2</b><span>3 pistes chiffrées</span></div><div><b>3</b><span>un sprint par semaine</span></div>
+        </div>
+        <button className="btn primary block big" type="button" disabled={busy === "q"} onClick={() => void step()}>{k.interview.length ? "Reprendre le diagnostic" : "Commencer · 5 min"}</button>
+        {busy === "q" && <Thinking>Il prépare sa question</Thinking>}
       </Card>
     );
   }
-
+  const n = k.interview.length;
   return (
-    <Card title="Mission en cours" aside={<span className="tag">palier {M.index + 1} / {M.total}{M.fromRoadmap ? "" : " · échelle de base"}</span>}>
-      <p className="h-display" style={{ fontSize: 28 }}>{M.title}</p>
-      <p className="muted">{M.detail}</p>
-      <p className="small"><b>Preuve exigée.</b> <span className="muted">{M.proof} · délai indicatif {M.jours} j</span></p>
-      {stake && (
-        <div className="alert" style={{ padding: "10px 12px" }}>
-          <span className="eyebrow">Mise engagée</span>
-          <p><b className="num">{f0(stake.amount)} €</b> en jeu · échéance dans <b className="num">{Math.max(0, Math.floor(left / DAY))} j {Math.max(0, Math.floor((left % DAY) / 3600e3))} h</b>. Mission non livrée à temps : mise perdue et −10 % sur le Capital.</p>
-        </div>
-      )}
-
-      <hr className="sep" />
-      <span className="eyebrow">Plan d'attaque</span>
-      {steps ? (
-        <div className="todo">
-          {steps.items.map((s, i) => (
-            <button key={i} type="button" className={s.done ? "ok" : ""} onClick={() => toggleStep(i)}>
-              <span className="box">{s.done ? "✓" : ""}</span><span className="lab">{s.t}</span><span />
-            </button>
-          ))}
-        </div>
-      ) : busy === "steps" ? <Thinking>Le Contremaître découpe ta mission</Thinking> : (
-        <div><button className="btn small" type="button" onClick={() => void makeSteps()}>Découper la mission en étapes</button></div>
-      )}
-      {steps && <button className="linkish" type="button" disabled={busy === "steps"} onClick={() => void makeSteps()}>Refaire le plan d'attaque</button>}
-
-      <hr className="sep" />
-      <span className="eyebrow">Journal · le plancher quotidien</span>
-      {floorDone && logToday.length > 0 && <p><b style={{ color: "var(--ok)" }}>Posé.</b> <span className="muted">« {logToday[logToday.length - 1].text} »</span></p>}
-      <label className="f" htmlFor="ml-text">{floorDone ? "Autre chose de fait aujourd'hui ?" : "Qu'as-tu fait AUJOURD'HUI pour cette mission ?"}
-        <input type="text" id="ml-text" value={logText} onChange={(e) => setLogText(e.target.value)} placeholder="Une action concrète, vérifiable" />
-      </label>
-      <div className="btn-row">
-        <button className="btn" type="button" onClick={() => { const t = logText.trim(); if (t.length < 15) { toast("Une action concrète. Quinze caractères minimum."); return; } logAction(t); clearLog(); }}>Consigner l'action</button>
-        <button className="btn ghost" type="button" onClick={() => { setPanel(panel === "bloque" ? "" : "bloque"); setCoach(null); }}>Je bloque</button>
-        <button className="btn ghost" type="button" onClick={() => setPanel(panel === "changer" ? "" : "changer")}>Changer de mission</button>
-      </div>
-      {panel === "bloque" && (
+    <Card title="Diagnostic" aside={<span className="num">{n + 1} / ~8</span>}>
+      <div className="dots" aria-hidden="true">{Array.from({ length: Math.max(8, n + 1) }, (_, i) => <span key={i} className={i < n ? "on" : i === n ? "cur" : ""} />)}</div>
+      {busy === "q" ? <Thinking>Il écoute ta réponse</Thinking> : (
         <>
-          <label className="f" htmlFor="cap-block">Qu'est-ce qui coince, exactement ?<textarea id="cap-block" style={{ minHeight: 70 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ex. : je n'ose pas fixer un prix ; je ne sais pas où trouver des clients" /></label>
-          <div><button className="btn" type="button" disabled={busy === "bloque"} onClick={() => void askUnblock()}>Demander au Contremaître</button></div>
-          {busy === "bloque" && <Thinking>Le Contremaître analyse</Thinking>}
-          {coach && <Foreman who="Déblocage" say={coach.phrase || undefined} sayStyle={{ fontSize: 22 }}><p className="voice">{coach.diagnostic}</p><p className="voice"><b>À faire sous 24 h :</b> {coach.action}</p></Foreman>}
-        </>
-      )}
-      {panel === "changer" && (
-        <>
-          <label className="f" htmlFor="cap-change">Pourquoi cette mission ne te convient pas<textarea id="cap-change" style={{ minHeight: 70 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ex. : je n'ai aucun objet à vendre ; ça ne colle pas avec mes compétences" /></label>
-          <p className="muted small">Le Contremaître juge ta raison : une fuite donnera une mission aussi dure.</p>
-          <div><button className="btn" type="button" disabled={busy === "changer"} onClick={() => void askChange()}>Proposer une autre mission</button></div>
-          {busy === "changer" && <Thinking>Le Contremaître cherche une autre mission</Thinking>}
-        </>
-      )}
-
-      <hr className="sep" />
-      <span className="eyebrow">Livraison</span>
-      <label className="f" htmlFor="mi-proof">Ce que tu as fait, à qui, comment
-        <textarea id="mi-proof" style={{ minHeight: 80 }} value={proofText} onChange={(e) => setProofText(e.target.value)} placeholder="Ex. : 3 h de cours de Python à un lycéen, 25 €/h, payé par virement." />
-      </label>
-      <label className="f" htmlFor="mi-amount">Montant encaissé (€)
-        <input type="number" id="mi-amount" inputMode="decimal" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
-      </label>
-      <div className="shot">
-        {photo ? <><img className="proof-thumb" src={photo.thumb} alt="Photo de preuve" /><button className="linkish" type="button" onClick={() => setPhoto(null)}>Retirer</button></>
-          : <><button className="btn" type="button" onClick={() => fileRef.current?.click()}>Photo de la preuve</button><span className="muted small">capture du paiement, du message, du reçu</span></>}
-        <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { void onPhoto(e.target.files?.[0]); e.target.value = ""; }} />
-      </div>
-      <div className="btn-row">
-        <HoldButton label="Déclarer la mission livrée" hint="Livraison" onConfirm={() => void deliver()} />
-        {!stake && <button className="btn" type="button" onClick={() => setPanel(panel === "mise" ? "" : "mise")}>Engager une mise</button>}
-      </div>
-      {panel === "mise" && !stake && (
-        <>
-          <div className="grid2">
-            <label className="f" htmlFor="st-amt">Mise (€)<input type="number" id="st-amt" inputMode="numeric" min="5" value={stakeAmt} onChange={(e) => setStakeAmt(e.target.value)} /></label>
-            <label className="f" htmlFor="st-days">Délai (jours)<input type="number" id="st-days" inputMode="numeric" min="2" max="30" value={stakeDays} onChange={(e) => setStakeDays(e.target.value)} /></label>
+          <p className="question">{k.ask.q}</p>
+          {k.ask.choix.length > 0 && <div className="chips">{k.ask.choix.map((ch) => <button key={ch} type="button" className="chip" onClick={() => void step(ch)}>{ch}</button>)}</div>}
+          <div className="answer">
+            <textarea aria-label="Ta réponse" value={ans} onChange={(e) => setAns(e.target.value)} placeholder="Réponds précisément. Des noms, des chiffres." />
+            {canDictate && <button type="button" className={"cp-mic" + (listening ? " on" : "")} aria-label="Dicter" onClick={() => (listening ? stopDictation() : dictate((t) => setAns(t)))}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+            </button>}
           </div>
-          <p className="muted small">Engagement d'honneur : l'appli ne touche pas à ton argent. Si tu échoues, verse-la vraiment à une association. Le registre s'en souviendra.</p>
-          <div><HoldButton tone="danger" ms={1200} label="Je m'engage" hint="Engagement" onConfirm={engage} /></div>
+          <div className="btn-row">
+            <button className="btn primary" type="button" disabled={ans.trim().length < 2} onClick={() => void step(ans.trim())}>Suivant</button>
+            {n >= 4 && <button className="btn ghost" type="button" onClick={() => void options()}>Voir mes pistes</button>}
+          </div>
         </>
       )}
     </Card>
   );
 }
 
-/* ---------------- Concept du jour ---------------- */
+/* ---------------- 2. Pistes ---------------- */
 
-function ConceptCard({ now }: { now: number }) {
-  const c = useChantier()!;
-  const act = useStore((s) => s.act);
-  const M = currentMission(c);
-  const today = dayKey(now);
-  const pick = c.concept?.date === today ? c.concept : null;
-  const fallback = todayConcept(now);
-  const concept = pick ?? { date: today, nom: fallback.name, pourquoi: "", question: `Explique-le, puis applique-le à ta mission : « ${M.title} ».` };
-  const done = c.concepts.find((x) => dayKey(x.ts) === today);
-  const [answer, setAnswer, clearAnswer] = useDraft("cap-concept");
-  const [busy, setBusy] = useState<"" | "pick" | "exam">("");
-  const [exam, setExam] = useState<ExamView | null>(null);
-  const tried = useRef("");
+const SCORES: [keyof BizOption["scores"], string][] = [["marche", "Marché"], ["competence", "Toi"], ["vitesse", "Vitesse"], ["echelle", "Échelle"]];
+const avg = (o: BizOption) => (o.scores.marche + o.scores.competence + o.scores.vitesse + o.scores.echelle) / 4;
 
-  useEffect(() => {
-    if (pick || done || !aiReady() || tried.current === today) return;
-    tried.current = today;
-    setBusy("pick");
-    pickConcept(true).then((r) => { setBusy(""); if (r) act((d) => { d.concept = { date: today, ...r }; }); });
-  }, [pick, done, today, act]);
-
-  const submit = async () => {
-    const n = wc(answer);
-    if (n < 60) { toast(`${n} ${plural(n, "mot")}. Il en faut 60. Développe.`); return; }
-    setBusy("exam");
-    const r = await examineConcept(concept.nom, concept.question, M.title, answer.trim());
-    const note = r ? r.note : Math.min(6, Math.floor(n / 25));
-    const verdict = r ? `${r.verdict}\nLacune : ${r.lacune}\nÀ appliquer : ${r.application}` : "";
-    const g = act((d) => {
-      d.concepts.push({ ts: Date.now(), c: concept.nom, ans: answer.trim(), note, verdict });
-      if (note >= 8) win(d, "capital", `${note}/10 sur « ${concept.nom} »`, Date.now());
-      return gain(d, "capital", note * POINTS.conceptFactor, Date.now());
-    });
-    gainToast("capital", g);
-    setBusy(""); clearAnswer();
-    setExam({ note, ai: !!r, lines: r ? [["Verdict", r.verdict], ["Lacune", r.lacune], ["À appliquer", r.application]] : [] });
-  };
-
+function ScoreBars({ o }: { o: BizOption }) {
   return (
-    <Card title="Concept du jour" aside={pick ? "choisi pour ta mission" : "théorie au service de la mission"}>
-      {busy === "pick" ? <Thinking>Le Contremaître choisit ce qu'il te manque</Thinking> : (
-        <>
-          <p className="h-display" style={{ fontSize: 26 }}>{concept.nom}</p>
-          {concept.pourquoi && <p className="muted small">{concept.pourquoi}</p>}
-        </>
-      )}
-      {exam ? <ExamResult exam={exam} onContinue={() => setExam(null)} /> : done ? (
-        <>
-          <p><b style={{ color: done.note >= 6 ? "var(--ok)" : "var(--blood)" }}>Examiné : {done.note}/10.</b></p>
-          {done.verdict && <p className="voice">{done.verdict}</p>}
-        </>
-      ) : busy !== "pick" && (
-        <>
-          <p className="voice">{concept.question}</p>
-          <label className="f" htmlFor="co-ans">Ta réponse
-            <textarea id="co-ans" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Définition, calcul, application à ta mission." />
-          </label>
-          <div className="counter num">{wc(answer)} {plural(wc(answer), "mot")} · 60 minimum</div>
-          <div><button className="btn primary" type="button" disabled={busy === "exam"} onClick={() => void submit()}>Soumettre à l'examen</button></div>
-          {busy === "exam" && <Thinking>L'Examinateur lit ta copie</Thinking>}
-        </>
-      )}
-    </Card>
+    <div className="sbars">
+      {SCORES.map(([k, l]) => <div key={k}><span>{l}</span><i><b style={{ width: `${o.scores[k] * 10}%` }} /></i><em className="num">{o.scores[k]}</em></div>)}
+    </div>
   );
 }
 
-/* ---------------- Feuille de route ---------------- */
+function OptionDetail({ o }: { o: BizOption }) {
+  return (
+    <div className="odetail">
+      <p><b>Offre.</b> {o.offre}</p>
+      <p><b>Cible.</b> {o.cible}</p>
+      <p><b>Canal.</b> {o.canal}</p>
+      <p><b>Pourquoi toi.</b> {o.pourquoiToi}</p>
+    </div>
+  );
+}
 
-function RoadmapCard({ onProof }: { onProof: (id: string) => void }) {
+function Options() {
   const c = useChantier()!;
-  const act = useStore((s) => s.act);
-  const r = c.roadmap ?? ladderRoadmap(c.missionLevel);
-  const [open, setOpen] = useState(false);
-  const [demande, setDemande] = useState("");
+  const opts = c.capital.options!;
+  const best = opts.reduce((a, b) => (avg(b) > avg(a) ? b : a), opts[0]);
+  const [open, setOpen] = useState<string | null>(null);
+  const [goal, setGoal] = useState<Record<string, string>>({});
+  const [fb, setFb] = useState("");
   const [busy, setBusy] = useState(false);
-  const regen = async () => {
-    setBusy(true);
-    const x = await genRoadmap(demande.trim());
-    setBusy(false);
-    if (x) { act((d) => { d.roadmap = { ts: Date.now(), vision: x.vision, paliers: x.paliers, index: 0 }; d.missionSteps = null; d.concept = null; }); setOpen(false); setDemande(""); toast("Feuille de route refaite."); }
-  };
-  const delivered = (title: string) => c.missions.find((m) => m.title === title);
+  const again = async () => { setBusy(true); await O.makeOptions(fb.trim()); setBusy(false); setFb(""); };
   return (
-    <Card title="Feuille de route" aside={c.roadmap ? `depuis le ${fdate(c.roadmap.ts)}` : "échelle de base"}>
-      <p className="muted small">{r.vision}</p>
-      <div className="ladder">
-        {r.paliers.map((P, i) => {
-          const cls = i < r.index ? "done" : i === r.index ? "cur" : "lock";
-          const m = i < r.index ? delivered(P.titre) : undefined;
+    <>
+      <div className="opts">
+        {opts.map((o) => {
+          const on = open === o.id;
+          const g = goal[o.id] ?? String(Math.max(100, Math.round((o.potentielMois * 0.4) / 50) * 50));
           return (
-            <div className={"rung " + cls} key={i}>
-              <span className="lv">{i + 1}</span>
-              <div>
-                <div className="tt">{P.titre}</div>
-                <div className="dd">{m ? `Livré le ${fdate(m.ts)} · ${f0(m.amount)} € · ${m.proof}` : P.pourquoi}</div>
-                {m?.photo && <button className="linkish" type="button" onClick={() => onProof(m.photo!)}>Voir la preuve</button>}
-              </div>
+            <div key={o.id} className={"opt" + (on ? " on" : "")}>
+              <button type="button" className="opt-head" onClick={() => setOpen(on ? null : o.id)} aria-expanded={on}>
+                <span className="opt-n">{o.nom}{o.id === best.id && <span className="tag ok">meilleure note</span>}</span>
+                <span className="opt-o">{o.offre}</span>
+                <span className="opt-k">
+                  <span><b className="num">{o.prix}</b><i>prix</i></span>
+                  <span><b className="num">J+{o.premierEuroJours}</b><i>1er €</i></span>
+                  <span><b className="num">{f0(o.potentielMois)} €</b><i>/mois à 1 an</i></span>
+                </span>
+                <ScoreBars o={o} />
+              </button>
+              {on && (
+                <div className="opt-body">
+                  <OptionDetail o={o} />
+                  <label className="f" htmlFor={"goal-" + o.id}>Objectif mensuel (€)
+                    <input id={"goal-" + o.id} type="number" inputMode="numeric" value={g} onChange={(e) => setGoal({ ...goal, [o.id]: e.target.value })} />
+                  </label>
+                  <HoldButton block label="Je choisis cette piste" hint="Engagement" onConfirm={() => { O.chooseThesis(o, num(g) || 0); buzz([40, 30, 80]); }} />
+                </div>
+              )}
             </div>
           );
         })}
       </div>
-      {open ? (
-        <>
-          <label className="f" htmlFor="rm-ask">Ce qui ne te correspond pas (facultatif)
-            <textarea id="rm-ask" style={{ minHeight: 70 }} value={demande} onChange={(e) => setDemande(e.target.value)} placeholder="Ex. : je veux m'appuyer sur la data et l'IA ; pas de vente physique" />
-          </label>
-          <p className="muted small">Tes missions livrées et tes euros sont conservés ; la nouvelle feuille de route repart de là où tu en es.</p>
-          <div className="btn-row">
-            <button className="btn primary" type="button" disabled={busy} onClick={() => void regen()}>{c.roadmap ? "Refaire la feuille de route" : "Construire ma feuille de route"}</button>
-            <button className="btn ghost" type="button" onClick={() => setOpen(false)}>Annuler</button>
+      <Fold title="Aucune ne me va">
+        <textarea aria-label="Pourquoi" value={fb} onChange={(e) => setFb(e.target.value)} placeholder="Pourquoi ? Ex. : je veux capitaliser sur la data ; pas de démarchage physique" style={{ minHeight: 70 }} />
+        <div className="btn-row">
+          <button className="btn" type="button" disabled={busy} onClick={() => void again()}>3 autres pistes</button>
+          <button className="linkish small" type="button" onClick={() => useStore.getState().act((d) => { d.capital.interview = []; d.capital.ask = null; d.capital.diagDone = false; d.capital.options = null; })}>Refaire le diagnostic</button>
+        </div>
+        {busy && <Thinking>Il cherche autre chose</Thinking>}
+      </Fold>
+    </>
+  );
+}
+
+/* ---------------- 3. Tableau de bord ---------------- */
+
+function CashHero({ now, onCash }: { now: number; onCash: () => void }) {
+  const c = useChantier()!;
+  const t = c.capital.thesis!;
+  const m = monthCash(c, now);
+  const d = new Date(now), daysLeft = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() - d.getDate();
+  return (
+    <div className="cash">
+      <Ring value={m} max={t.objectifMois} size={128} color="var(--c-capital)">
+        <b className="num">{f0(m)} €</b><span>sur {f0(t.objectifMois)}</span>
+      </Ring>
+      <div className="cash-side">
+        <div><b className="num">{f0(c.euros)} €</b><span>gagnés seul, en tout</span></div>
+        <div><b className="num">{daysLeft} j</b><span>avant la fin du mois</span></div>
+        <button className="btn primary" type="button" onClick={onCash}>+ Encaissement</button>
+      </div>
+    </div>
+  );
+}
+
+function SprintCard({ now }: { now: number }) {
+  const c = useChantier()!;
+  const s = c.capital.sprint;
+  const week = O.weekKey(now);
+  const [busy, setBusy] = useState(false);
+  const tried = useRef("");
+  const make = async () => { setBusy(true); await O.makeSprint(); setBusy(false); };
+  useEffect(() => { if ((!s || s.semaine !== week) && aiReady() && tried.current !== week) { tried.current = week; void make(); } }, [s?.semaine, week]);
+  if (!s || s.semaine !== week) {
+    return <Card title="Sprint de la semaine">{busy ? <Thinking>Il fixe les chiffres de ta semaine</Thinking> : <button className="btn primary" type="button" onClick={() => void make()}>Lancer le sprint</button>}</Card>;
+  }
+  const dow = (new Date(now).getDay() + 6) % 7;
+  const done = s.kpis.reduce((a, k) => a + Math.min(k.fait, k.cible), 0), tot = s.kpis.reduce((a, k) => a + k.cible, 0);
+  return (
+    <Card title="Sprint de la semaine" aside={<span className="num">J{dow + 1}/7 · {tot ? Math.round((done / tot) * 100) : 0} %</span>}>
+      <p className="sprint-goal">{s.objectif}</p>
+      <div className="kpi-list">
+        {s.kpis.map((k) => (
+          <div className={"kpi" + (k.fait >= k.cible ? " ok" : "")} key={k.id}>
+            <span className="kpi-l">{k.label}</span>
+            <span className="kpi-v num">{k.fait}<i>/{k.cible}</i></span>
+            <button type="button" className="kpi-minus" aria-label={`Retirer 1 : ${k.label}`} onClick={() => O.bumpKpi(k.id, -1)}>−</button>
+            <button type="button" className="kpi-plus" aria-label={`Ajouter 1 : ${k.label}`} onClick={() => { O.bumpKpi(k.id, 1); buzz(15); }}>+1</button>
+            <span className="kpi-bar"><b style={{ width: `${Math.min(100, (k.fait / k.cible) * 100)}%` }} /></span>
           </div>
-          {busy && <Thinking>Le Contremaître construit ta feuille de route</Thinking>}
-        </>
-      ) : (
-        <div><button className="btn small" type="button" onClick={() => setOpen(true)}>{c.roadmap ? "Ajuster la feuille de route" : "Construire ma feuille de route personnelle"}</button></div>
-      )}
+        ))}
+      </div>
+      <Fold title="Le message à envoyer">
+        <div className="script">{s.script}</div>
+        <div className="btn-row">
+          <button className="btn small" type="button" onClick={() => { void navigator.clipboard?.writeText(s.script).then(() => toast("Copié."), () => toast("Copie impossible : sélectionne le texte.")); }}>Copier</button>
+          <button className="btn small ghost" type="button" onClick={() => openCoach("capital", "Réécris mon message de prospection pour ")}>L'adapter</button>
+        </div>
+      </Fold>
+      <div className="btn-row spread">
+        <button className="linkish small" type="button" onClick={() => openCoach("capital", "Je bloque sur mon sprint : ")}>Je bloque</button>
+        <button className="linkish small" type="button" disabled={busy} onClick={() => void make()}>Refaire le sprint</button>
+      </div>
     </Card>
   );
 }
+
+function Funnel({ onPaid }: { onPaid: (p: Prospect) => void }) {
+  const c = useChantier()!;
+  const ps = c.capital.prospects;
+  const [nom, setNom] = useState("");
+  const [note, setNote] = useState("");
+  const counts = STAGES.map((_, i) => ps.filter((p) => p.stage >= i).length);
+  const max = Math.max(1, counts[0]);
+  const live = ps.filter((p) => p.stage < 4).sort((a, b) => b.maj - a.maj);
+  const advance = (p: Prospect) => { if (p.stage === 3) { onPaid(p); return; } O.moveProspect(p.id, p.stage + 1); buzz(10); };
+  return (
+    <Card title="Entonnoir" aside={`${ps.length} ${plural(ps.length, "prospect")}`}>
+      <div className="funnel">
+        {STAGES.map((s, i) => (
+          <div key={s} className="fun-row"><span>{s}</span><i><b style={{ width: `${(counts[i] / max) * 100}%`, opacity: 1 - i * 0.12 }} /></i><em className="num">{counts[i]}</em></div>
+        ))}
+      </div>
+      {counts[0] > 0 && <p className="mono small muted">Conversion contacté → payé : {Math.round((counts[4] / counts[0]) * 100)} %</p>}
+      <div className="pros">
+        {live.slice(0, 8).map((p) => (
+          <div className="pro" key={p.id}>
+            <span className="pro-n">{p.nom}{p.note && <i>{p.note}</i>}</span>
+            <button type="button" className="pro-s" onClick={() => advance(p)} aria-label={`${p.nom} : passer à ${STAGES[p.stage + 1]}`}>{STAGES[p.stage]} <b>›</b></button>
+          </div>
+        ))}
+      </div>
+      <form className="pro-add" onSubmit={(e) => { e.preventDefault(); if (O.addProspect(nom, note)) { setNom(""); setNote(""); } else toast("Un nom, deux lettres minimum."); }}>
+        <input aria-label="Nom du prospect" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nouveau prospect" />
+        <input aria-label="Note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note" />
+        <button className="btn" type="submit">+</button>
+      </form>
+    </Card>
+  );
+}
+
+function CashSheet({ open, prospect, onClose }: { open: boolean; prospect?: Prospect; onClose: () => void }) {
+  const demo = useIsDemo();
+  const act = useStore((s) => s.act);
+  const [amount, setAmount, clearAmount] = useDraft("cap-amount");
+  const [what, setWhat] = useState("");
+  const [photo, setPhoto] = useState<{ full: string; thumb: string } | null>(null);
+  const file = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (open) setWhat(prospect ? `Paiement de ${prospect.nom}` : ""); }, [open, prospect]);
+  const onPhoto = async (f: File | undefined) => {
+    if (!f) return;
+    try { setPhoto({ full: await toJpeg(f, 1100, 0.78), thumb: await toJpeg(f, 200, 0.7) }); } catch { toast("Photo illisible."); }
+  };
+  const save = async () => {
+    const amt = num(amount || "0");
+    if (!(amt > 0)) { toast("Un montant encaissé, supérieur à zéro."); return; }
+    if (what.trim().length < 4) { toast("Dis ce qui a été payé."); return; }
+    if (!photo && !demo) { toast("Sans capture du paiement, rien ne compte."); return; }
+    const ts = Date.now();
+    let photoId: string | null = null;
+    if (photo && !demo) { photoId = "m-" + ts; try { await saveProof(photoId, photo.full); } catch { photoId = null; } }
+    const r = act((d) => {
+      d.missions.push({ ts, level: -1, title: what.trim().slice(0, 90), proof: what.trim(), amount: amt, photo: photoId });
+      d.euros += amt;
+      if (prospect) { const p = d.capital.prospects.find((x) => x.id === prospect.id); if (p) { p.stage = 4; p.maj = ts; } }
+      win(d, "capital", `${what.trim()} : ${f0(amt)} €`, ts);
+      return gain(d, "capital", missionPoints(0, amt, true), ts);
+    });
+    gainToast("capital", r, `${f0(amt)} €`); buzz([60, 40, 120]);
+    clearAmount(); setPhoto(null); onClose();
+  };
+  return (
+    <Sheet open={open} onClose={onClose} label="Encaissement">
+      <span className="eyebrow">Encaissement</span>
+      <input className="big-num" type="number" inputMode="decimal" aria-label="Montant en euros" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0 €" />
+      <input type="text" aria-label="Ce qui a été payé" value={what} onChange={(e) => setWhat(e.target.value)} placeholder="Ce qui a été payé, par qui" />
+      <div className="shot">
+        {photo ? <><img className="proof-thumb" src={photo.thumb} alt="Preuve" /><button className="linkish" type="button" onClick={() => setPhoto(null)}>Retirer</button></>
+          : <button className="btn" type="button" onClick={() => file.current?.click()}>Capture du paiement</button>}
+        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { void onPhoto(e.target.files?.[0]); e.target.value = ""; }} />
+      </div>
+      <HoldButton block label="Encaisser" hint="Preuve" onConfirm={() => void save()} />
+    </Sheet>
+  );
+}
+
+/* ---------------- Concept du jour : une carte, au service de la piste ---------------- */
+
+function ConceptRow({ now }: { now: number }) {
+  const c = useChantier()!;
+  const act = useStore((s) => s.act);
+  const today = dayKey(now);
+  const pick = c.concept?.date === today ? c.concept : null;
+  const piste = c.capital.thesis?.option.nom ?? "ta piste";
+  const concept = pick ?? { date: today, nom: todayConcept(now).name, pourquoi: "", question: `Explique-le, puis applique-le à ${piste}, chiffres à l'appui.` };
+  const done = c.concepts.find((x) => dayKey(x.ts) === today);
+  const [open, setOpen] = useState(false);
+  const [answer, setAnswer, clearAnswer] = useDraft("cap-concept");
+  const [busy, setBusy] = useState(false);
+  const [exam, setExam] = useState<ExamView | null>(null);
+  const tried = useRef("");
+  useEffect(() => {
+    if (pick || done || !aiReady() || tried.current === today) return;
+    tried.current = today;
+    void pickConcept(true).then((r) => { if (r) act((d) => { d.concept = { date: today, ...r }; }); });
+  }, [pick, done, today, act]);
+  const submit = async () => {
+    const n = wc(answer);
+    if (n < 60) { toast(`${n} ${plural(n, "mot")}. 60 minimum.`); return; }
+    setBusy(true);
+    const r = await examineConcept(concept.nom, concept.question, piste, answer.trim());
+    const note = r ? r.note : Math.min(6, Math.floor(n / 25));
+    const g = act((d) => {
+      d.concepts.push({ ts: Date.now(), c: concept.nom, ans: answer.trim(), note, verdict: r ? `${r.verdict}\nÀ appliquer : ${r.application}` : "" });
+      if (note >= 8) win(d, "capital", `${note}/10 sur « ${concept.nom} »`, Date.now());
+      return gain(d, "capital", note * POINTS.conceptFactor, Date.now());
+    });
+    gainToast("capital", g); setBusy(false); clearAnswer();
+    setExam({ note, ai: !!r, lines: r ? [["Verdict", r.verdict], ["Lacune", r.lacune], ["À appliquer", r.application]] : [] });
+  };
+  return (
+    <>
+      <button type="button" className="mini-row" onClick={() => setOpen(true)}>
+        <span className="eyebrow">Concept du jour</span><b>{concept.nom}</b><span className={"mini-s " + (done ? (done.note >= 6 ? "up" : "down") : "")}>{done ? `${done.note}/10` : "›"}</span>
+      </button>
+      <Sheet open={open} onClose={() => { setOpen(false); setExam(null); }} label="Concept du jour">
+        <span className="eyebrow">Concept du jour</span>
+        <h2 className="h-display" style={{ fontSize: 28 }}>{concept.nom}</h2>
+        {concept.pourquoi && <p className="muted small">{concept.pourquoi}</p>}
+        {exam ? <ExamResult exam={exam} onContinue={() => { setExam(null); setOpen(false); }} /> : done ? <p className="voice">{done.note}/10. {done.verdict}</p> : (
+          <>
+            <p className="voice">{concept.question}</p>
+            <textarea aria-label="Ta réponse" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Définition, calcul, application." />
+            <div className="counter num">{wc(answer)} / 60 mots</div>
+            <button className="btn primary block" type="button" disabled={busy} onClick={() => void submit()}>Soumettre</button>
+            {busy && <Thinking>L'Examinateur lit</Thinking>}
+          </>
+        )}
+      </Sheet>
+    </>
+  );
+}
+

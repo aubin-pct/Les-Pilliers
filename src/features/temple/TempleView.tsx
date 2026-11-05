@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { PILLAR, PILLAR_IDS } from "@/content/pillars";
 import { TESTS } from "@/content/corps";
 import { doneToday, streak, totalHeight, weekDelta } from "@/engine/core";
-import { foremanLine, localReport, pendingTitle, weekData } from "@/engine/insights";
+import { localReport, weekData } from "@/engine/insights";
 import { weeklyReport } from "@/ai/contremaitre";
-import { DAY, f0, f1, fdate, fdateK, keyToTs, pad, plural, startOfDay } from "@/lib/format";
+import { DAY, f0, f1, fdate, fdateK, keyToTs, pad, startOfDay } from "@/lib/format";
 import { exportBackup } from "@/lib/backup";
 import { aiEnabled, useChantier, useIsDemo, useSettings, useStore } from "@/store";
 import { toast } from "@/store/ui";
-import { Card, Foreman, Thinking, useNow } from "@/ui/kit";
+import { Fold, Thinking, useNow } from "@/ui/kit";
+import { CoachHead } from "@/features/coach/CoachHead";
 import { TempleSvg } from "./TempleSvg";
 import { Dossier, ExcuseBars, HistChart } from "./Charts";
 import { AccountSheet } from "./AccountSheet";
@@ -26,20 +27,18 @@ export function TempleView() {
   const nav = useNavigate();
   const [account, setAccount] = useState(false);
   const [reporting, setReporting] = useState(false);
-  const fl = foremanLine(c, now);
   const monthEx = c.excuses.filter((e) => e.ts > now - 30 * DAY).length;
   const rest = startOfDay(now) + DAY - now;
-  const doneN = PILLAR_IDS.filter((id) => doneToday(c, id, now)).length;
   const reportFresh = c.report && now - c.report.ts < 7 * DAY;
-  const backupDue = !demo && now - c.created > 7 * DAY && (!settings.lastBackup || now - keyToTs(settings.lastBackup) > 14 * DAY);
+  const backupDue = !demo && !settings.syncUrl && now - c.created > 7 * DAY && (!settings.lastBackup || now - keyToTs(settings.lastBackup) > 14 * DAY);
 
   const zero = [
-    { ok: TESTS.every((T) => c.tests.some((t) => t.kind === T.id)), t: "Passer les quatre tests étalons", to: "/corps" },
-    { ok: c.orals.length > 0, t: "Premier oral de 90 secondes", to: "/verbe" },
-    { ok: c.esprit.length > 0, t: "Première explication à l'Examinateur", to: "/esprit" },
-    { ok: c.missionLog.length > 0 || c.missions.length > 0, t: "Première action de mission", to: "/capital" },
-    { ok: aiEnabled(settings), t: "Brancher le Contremaître IA (clé DeepSeek)", to: "/reglages" },
-    { ok: profileGaps(c.profile).length === 0, t: "Compléter ton profil (" + (profileGaps(c.profile).join(", ") || "ok") + ")", to: "/profil" },
+    { ok: aiEnabled(settings), t: "Clé DeepSeek", to: "/reglages" },
+    { ok: profileGaps(c.profile).length === 0, t: "Profil complet", to: "/profil" },
+    { ok: TESTS.every((T) => c.tests.some((t) => t.kind === T.id)), t: "4 tests étalons", to: "/corps" },
+    { ok: c.capital.thesis !== null, t: "Piste Capital", to: "/capital" },
+    { ok: c.esprit.length > 0, t: "1er sujet", to: "/esprit" },
+    { ok: c.orals.length > 0, t: "1er oral", to: "/verbe" },
   ];
 
   const runReport = async () => {
@@ -53,114 +52,79 @@ export function TempleView() {
   return (
     <div className="view">
       {demo && (
-        <div className="band">
-          <div><span className="pill demo">Démo</span></div>
-          <p>Ces données sont <b>simulées</b> : 47 jours d'un utilisateur fictif. Rien de ce que tu fais ici n'est enregistré.</p>
-          <div className="btn-row"><button className="btn primary small" type="button" onClick={quitDemo}>Quitter la démo</button></div>
+        <div className="band row-band">
+          <span className="pill demo">Démo</span><span className="small">Données simulées. Rien n'est enregistré.</span>
+          <button className="btn small" type="button" onClick={quitDemo}>Quitter</button>
         </div>
       )}
 
-      <Foreman who={c.profile?.prenom ? `Le Contremaître · à ${c.profile.prenom}` : "Le Contremaître"} say={fl.say} sub={fl.sub} />
+      <CoachHead scope="temple" />
 
       {c.pending.length > 0 && (
-        <div className="alert">
-          <span className="eyebrow">{plural(c.pending.length, "Compte")} à rendre · {c.pending.length}</span>
-          <strong>{pendingTitle(c, now)}</strong>
-          <p className="muted">Gains divisés par deux tant que tu ne t'es pas expliqué.</p>
-          <div><button className="btn danger" type="button" onClick={() => setAccount(true)}>Rendre des comptes</button></div>
-        </div>
+        <button type="button" className="alert-row" onClick={() => setAccount(true)}>
+          <b className="num">{c.pending.length}</b><span>{c.pending.length > 1 ? "comptes" : "compte"} à rendre · gains ÷ 2</span><span className="go">Rendre ›</span>
+        </button>
       )}
 
       <div className="temple">
         <TempleSvg c={c} now={now} onPick={(id) => nav("/" + id)} />
         <div className="plabels">
           {PILLAR_IDS.map((id) => {
-            const P = PILLAR[id], wd = weekDelta(c, id);
+            const P = PILLAR[id], wd = weekDelta(c, id), d = doneToday(c, id, now);
             return (
-              <div className="plabel" key={id}>
+              <button type="button" className={"plabel" + (d ? " done" : "")} key={id} onClick={() => nav("/" + id)}>
                 <span className="n" style={{ color: P.color }}>{P.name}</span>
                 <span className="v num">{f1(c.p[id].s)}</span>
-                <span className={"d num " + (wd === null ? "muted" : wd >= 0 ? "up" : "down")}>{wd === null ? "—" : `${wd >= 0 ? "▲" : "▼"} ${f1(Math.abs(wd))} /7 j`}</span>
-                <span className="d down num">−{f1(P.rate * 100)} %/j</span>
-              </div>
+                <span className={"d num " + (wd === null ? "muted" : wd >= 0 ? "up" : "down")}>{wd === null ? "—" : `${wd >= 0 ? "▲" : "▼"}${f1(Math.abs(wd))}`}</span>
+                <span className={"fl " + (d ? "ok" : "ko")}>{d ? "posé" : "nu"}</span>
+              </button>
             );
           })}
         </div>
-        <p className="legend">HAUTEUR EN ASSISES · 1 TAMBOUR = 10 ASSISES · PLUS UN PILIER EST HAUT, PLUS IL S'ÉRODE</p>
+      </div>
+
+      <div className="stats">
+        <div className="stat"><span className="k num">{f0(totalHeight(c))}</span><span className="l">assises</span></div>
+        <div className="stat"><span className="k num">{streak(c, now)}</span><span className="l">jours complets</span></div>
+        <div className="stat"><span className="k num">{Math.floor(rest / 3600e3)}:{pad(Math.floor((rest % 3600e3) / 60e3))}</span><span className="l">avant minuit</span></div>
+        <div className="stat"><span className="k num" style={{ color: monthEx ? "var(--blood)" : undefined }}>{monthEx}</span><span className="l">excuses 30 j</span></div>
       </div>
 
       {!demo && zero.some((z) => !z.ok) && (
-        <Card title="Point zéro" aside={`${zero.filter((z) => z.ok).length}/${zero.length}`}>
-          <p className="muted small">Ce que tu mesures aujourd'hui, c'est ce contre quoi tu te battras demain.</p>
-          <div className="todo">
-            {zero.map((z) => (
-              <button key={z.t} type="button" className={z.ok ? "ok" : ""} onClick={() => nav(z.to)}>
-                <span className="box">{z.ok ? "✓" : ""}</span><span className="lab">{z.t}</span><span className="mono muted">›</span>
-              </button>
-            ))}
-          </div>
-        </Card>
+        <div className="zero">
+          {zero.map((z) => <button key={z.t} type="button" className={z.ok ? "ok" : ""} onClick={() => nav(z.to)}><span className="box">{z.ok ? "✓" : ""}</span>{z.t}</button>)}
+        </div>
       )}
 
       {backupDue && (
-        <div className="band">
-          <p><b>Aucune sauvegarde depuis {settings.lastBackup ? fdateK(settings.lastBackup) : "le début"}.</b> Un téléphone perdu, et tout le chantier part avec.</p>
-          <div><button className="btn small" type="button" onClick={() => void exportBackup()}>Exporter maintenant</button></div>
-        </div>
+        <button type="button" className="alert-row soft" onClick={() => void exportBackup()}>
+          <span>Pas de sauvegarde depuis {settings.lastBackup ? fdateK(settings.lastBackup) : "le début"}</span><span className="go">Exporter ›</span>
+        </button>
       )}
 
-      <Card title="Planchers du jour" aside={`${doneN}/4 · reste ${Math.floor(rest / 3600e3)} h ${pad(Math.floor((rest % 3600e3) / 60e3))}`}>
-        <div className="floors">
-          {PILLAR_IDS.map((id) => {
-            const d = doneToday(c, id, now);
-            return (
-              <button key={id} type="button" className={"floor " + (d ? "done" : "miss")} onClick={() => nav("/" + id)}>
-                <span className="r">{PILLAR[id].roman}</span><span className="s">{d ? "Posé" : "Nu"}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      <div className="stats">
-        <div className="stat"><span className="k num">{f0(totalHeight(c))}</span><span className="l">assises au total</span></div>
-        <div className="stat"><span className="k num">{streak(c, now)}</span><span className="l">jours complets d'affilée</span></div>
-        <div className="stat"><span className="k num" style={{ color: monthEx ? "var(--blood)" : undefined }}>{monthEx}</span><span className="l">excuses en 30 jours</span></div>
-      </div>
-
-      <MemoryCard c={c} />
-
-      <Card title="Courbe du chantier" aside={`${c.hist.length} ${plural(c.hist.length, "jour")}`}><HistChart c={c} now={now} /></Card>
-
-      <Card title="Dossier de preuves" aside="avant → maintenant"><Dossier c={c} /></Card>
-
-      <Card title="Rapport sans filtre" aside="7 derniers jours">
-        {reporting ? <Thinking>Le Contremaître relit ta semaine</Thinking> : <div className="voice">{reportFresh ? c.report!.text : localReport(c, now)}</div>}
-        {reportFresh && !reporting && <p className="mono muted" style={{ fontSize: 11 }}>Rédigé par le Contremaître IA le {fdate(c.report!.ts)}</p>}
-        <div className="btn-row"><button className="btn" type="button" disabled={reporting} onClick={runReport}>Faire parler le Contremaître</button></div>
-      </Card>
-
-      <Card title="Registre des excuses" aside={c.excuses.length}>
+      <Fold title="Courbe" aside={`${c.hist.length} j`} open><HistChart c={c} now={now} /></Fold>
+      <Fold title="Ce qu'il sait de toi" aside={`${Object.keys(c.memoire).length}/4`}><MemoryCard c={c} /></Fold>
+      <Fold title="Rapport de la semaine" aside={reportFresh ? fdate(c.report!.ts) : "7 j"}>
+        {reporting ? <Thinking>Il relit ta semaine</Thinking> : <div className="voice">{reportFresh ? c.report!.text : localReport(c, now)}</div>}
+        <div><button className="btn small" type="button" disabled={reporting} onClick={runReport}>Le faire parler</button></div>
+      </Fold>
+      <Fold title="Avant → maintenant"><Dossier c={c} /></Fold>
+      <Fold title="Excuses" aside={c.excuses.length}>
         <ExcuseBars c={c} now={now} />
         <div className="list">
-          {c.excuses.length ? c.excuses.slice(-6).reverse().map((e) => (
+          {c.excuses.slice(-6).reverse().map((e) => (
             <div className="li" key={e.ts + e.pillar}>
-              <span className="main">« {e.text} »</span>
-              <span className={"side " + (e.ok ? "up" : "down")}>{e.ok ? "recevable" : "rejetée"}</span>
-              <span className="sub">{PILLAR[e.pillar].name} · {fdateK(e.date)} — {e.verdict}</span>
+              <span className="main">« {e.text} »</span><span className={"side " + (e.ok ? "up" : "down")}>{e.ok ? "reçue" : "rejetée"}</span>
+              <span className="sub">{PILLAR[e.pillar].name} · {fdateK(e.date)}</span>
             </div>
-          )) : <p className="muted">Vide. Que ça dure.</p>}
+          ))}
         </div>
-      </Card>
-
-      <Card title="Bocal à victoires" aside={c.wins.length}>
-        <p className="muted small">Chaque record, chaque euro gagné seul, chaque 8/10 finit ici. Quand tu voudras lâcher, le Contremaître te le ressortira.</p>
+      </Fold>
+      <Fold title="Victoires" aside={c.wins.length}>
         <div className="list">
-          {c.wins.length ? c.wins.slice(-6).reverse().map((w) => (
-            <div className="li" key={w.ts + w.text}><span className="main">{w.text}</span><span className="side muted">{fdate(w.ts)}</span></div>
-          )) : <p className="muted">Rien encore. Va chercher la première.</p>}
+          {c.wins.length ? c.wins.slice(-8).reverse().map((w) => <div className="li" key={w.ts + w.text}><span className="main">{w.text}</span><span className="side muted">{fdate(w.ts)}</span></div>) : <p className="muted">Rien encore.</p>}
         </div>
-      </Card>
+      </Fold>
 
       <div className="foot"><span>Les Piliers · v{__APP_VERSION__}</span></div>
       <AccountSheet open={account} onClose={() => setAccount(false)} />

@@ -6,8 +6,8 @@ import { genProgramme } from "@/ai/contremaitre";
 import { DAY, dayIndex, fdate, plural } from "@/lib/format";
 import { useChantier, useStore } from "@/store";
 import { toast } from "@/store/ui";
-import { Card, PillarHeader, Sparkline, Thinking, useNow } from "@/ui/kit";
-import { MemoryNote } from "@/features/temple/Memory";
+import { Card, Fold, PillarHeader, Sparkline, Thinking, useNow } from "@/ui/kit";
+import { CoachHead } from "@/features/coach/CoachHead";
 import { TestSheet } from "./TestSheet";
 import { SessionCard } from "./SessionCard";
 
@@ -22,22 +22,18 @@ export function CorpsView() {
   return (
     <div className="view">
       <PillarHeader c={c} id="corps" now={now} />
-      <MemoryNote c={c} id="corps" />
+      <CoachHead scope="corps" />
 
       {surprise && (
-        <div className="alert">
-          <span className="eyebrow">Contrôle surprise</span>
-          <strong>{pick.name}. Maintenant.</strong>
-          <p className="muted">Aucun test depuis {Math.floor((now - lastTest) / DAY)} jours. Pas d'échauffement de trois heures. Pas de « demain ».</p>
-          <div><button className="btn danger" type="button" onClick={() => setTest(pick.id)}>Passer le test</button></div>
-        </div>
+        <button type="button" className="alert-row" onClick={() => setTest(pick.id)}>
+          <b className="num">{Math.floor((now - lastTest) / DAY)} j</b><span>sans test. Contrôle surprise : {pick.name.toLowerCase()}</span><span className="go">Go ›</span>
+        </button>
       )}
 
       <SessionCard c={c} now={now} />
-      <ProgrammeCard />
+      <WeekStrip />
 
-      <Card title="Tests étalons" aside="ce qui fait vraiment monter">
-        <p className="muted small">La séance ralentit l'érosion. Seul un record fait grimper le pilier. Égaler ton record ne rapporte rien : ça te coûte deux assises.</p>
+      <Card title="Tests étalons" aside="record = montée">
         <div className="tests">
           {TESTS.map((T) => {
             const all = c.tests.filter((t) => t.kind === T.id);
@@ -49,14 +45,15 @@ export function CorpsView() {
                 <span className="tv num">{l ? `${sg(l.value)} ${T.unit}` : "—"}</span>
                 <span className="tb num">{b !== null ? `record ${sg(b)} · ${fdate(l.ts)}` : "jamais passé"}</span>
                 <Sparkline values={all.map((t) => t.value)} color="var(--c-corps)" />
-                <button className="btn small" type="button" onClick={() => setTest(T.id)}>Passer le test</button>
+                <button className="btn small" type="button" onClick={() => setTest(T.id)}>Tester</button>
               </div>
             );
           })}
         </div>
       </Card>
 
-      <Card title="Journal" aside={`${c.seances.length} ${plural(c.seances.length, "séance")}`}>
+      <ProgrammeFold />
+      <Fold title="Journal" aside={`${c.seances.length} ${plural(c.seances.length, "séance")}`}>
         <div className="list">
           {c.seances.length ? c.seances.slice(-8).reverse().map((s) => (
             <div className="li" key={s.ts}>
@@ -64,23 +61,29 @@ export function CorpsView() {
               <span className="side muted">{fdate(s.ts)}</span>
               <span className="sub">{s.timed ? `${s.dur} min · ${s.done}/${s.total} ${s.logs ? "séries" : "exercices"}` : "sans chrono"}{s.rpe ? ` · effort ${s.rpe}/10` : ""}{s.note ? ` · « ${s.note} »` : ""}</span>
             </div>
-          )) : <p className="muted">Aucune séance. Le pilier attend.</p>}
+          )) : <p className="muted">Aucune séance.</p>}
         </div>
-      </Card>
+      </Fold>
 
       <TestSheet kind={test} onClose={() => setTest(null)} />
     </div>
   );
 }
 
-function ProgrammeCard() {
+function WeekStrip() {
+  const c = useChantier()!;
+  const prog = c.plans.programme ?? fallbackProgramme();
+  const today = new Date().toLocaleDateString("fr-FR", { weekday: "long" });
+  return <div className="week">{prog.semaine.map((s, i) => <span key={i} className={s.jour.toLowerCase() === today ? "today" : ""}><b>{s.jour.slice(0, 3)}</b>{s.focus}</span>)}</div>;
+}
+
+function ProgrammeFold() {
   const c = useChantier()!;
   const act = useStore((s) => s.act);
   const [open, setOpen] = useState(false);
   const [demande, setDemande] = useState("");
   const [busy, setBusy] = useState(false);
   const prog = c.plans.programme ?? fallbackProgramme();
-  const today = new Date().toLocaleDateString("fr-FR", { weekday: "long" });
   const regen = async () => {
     setBusy(true);
     const r = await genProgramme(demande.trim());
@@ -88,25 +91,21 @@ function ProgrammeCard() {
     if (r) { act((d) => { d.plans.programme = { ts: Date.now(), ...r }; if (d.seanceStart === null) d.plans.seance = null; }); setOpen(false); setDemande(""); toast("Programme refait."); }
   };
   return (
-    <Card title="Programme" aside={c.plans.programme ? `depuis le ${fdate(c.plans.programme.ts)}` : "de base"}>
-      <p className="h-display" style={{ fontSize: 24 }}>{prog.titre}</p>
+    <Fold title={"Programme · " + prog.titre} aside={c.plans.programme ? fdate(c.plans.programme.ts) : "de base"}>
       <p className="muted small">{prog.logique}</p>
-      <div className="week">{prog.semaine.map((s, i) => <span key={i} className={s.jour.toLowerCase() === today ? "today" : ""}><b>{s.jour.slice(0, 3)}</b>{s.focus}</span>)}</div>
       <p className="small"><b>Progression.</b> <span className="muted">{prog.progression}</span></p>
       {open ? (
         <>
-          <label className="f" htmlFor="pg-ask">Ce qui doit changer
-            <textarea id="pg-ask" style={{ minHeight: 70 }} value={demande} onChange={(e) => setDemande(e.target.value)} placeholder="Ex. : je ne peux m'entraîner que le soir, 3 fois ; je veux plus de tractions ; douleur au genou" />
-          </label>
+          <textarea id="pg-ask" aria-label="Ce qui doit changer" style={{ minHeight: 70 }} value={demande} onChange={(e) => setDemande(e.target.value)} placeholder="Ce qui doit changer. Ex. : 3 fois le soir ; plus de tractions" />
           <div className="btn-row">
-            <button className="btn primary" type="button" disabled={busy} onClick={() => void regen()}>Refaire le programme</button>
+            <button className="btn primary" type="button" disabled={busy} onClick={() => void regen()}>Refaire</button>
             <button className="btn ghost" type="button" onClick={() => setOpen(false)}>Annuler</button>
           </div>
-          {busy && <Thinking>Le Contremaître revoit ton programme</Thinking>}
+          {busy && <Thinking>Il revoit ton programme</Thinking>}
         </>
       ) : (
-        <div><button className="btn small" type="button" onClick={() => setOpen(true)}>{c.plans.programme ? "Ajuster le programme" : "Construire mon programme"}</button></div>
+        <div><button className="btn small" type="button" onClick={() => setOpen(true)}>{c.plans.programme ? "Ajuster" : "Construire mon programme"}</button></div>
       )}
-    </Card>
+    </Fold>
   );
 }

@@ -116,6 +116,34 @@ export function mergeChantier(baseIn: Chantier, localIn: Chantier, remoteIn: Cha
   out.parcoursActif = pick(base.parcoursActif, local.parcoursActif, remote.parcoursActif);
   out.seanceStart = pick(base.seanceStart, local.seanceStart, remote.seanceStart);
 
+  // v5 : conversations, brief, Capital v2, carte du savoir.
+  out.chats = {};
+  for (const k of ["temple", ...PILLAR_IDS] as const) {
+    const m = unionBy(base.chats[k] ?? [], local.chats[k] ?? [], remote.chats[k] ?? [], (x) => `${x.ts}|${x.from}`, ts, 60);
+    if (m.length) out.chats[k] = m;
+  }
+  out.brief = pick(base.brief, local.brief, remote.brief, (l, r) => ((l?.date ?? "") >= (r?.date ?? "") ? l : r));
+  out.knowledgeMap = pick(base.knowledgeMap, local.knowledgeMap, remote.knowledgeMap, (l, r) => ((l?.ts ?? 0) >= (r?.ts ?? 0) ? l : r));
+  const bc = base.capital, lc = local.capital, rc = remote.capital;
+  const longer = <T,>(l: T[], r: T[]) => (l.length >= r.length ? l : r);
+  out.capital = {
+    interview: pick(bc.interview, lc.interview, rc.interview, longer),
+    ask: pick(bc.ask, lc.ask, rc.ask),
+    diagDone: lc.diagDone || rc.diagDone,
+    options: pick(bc.options, lc.options, rc.options),
+    thesis: pick(bc.thesis, lc.thesis, rc.thesis, (l, r) => ((l?.ts ?? 0) >= (r?.ts ?? 0) ? l : r)),
+    sprint: pick(bc.sprint, lc.sprint, rc.sprint, (l, r) => {
+      if (!l || !r) return l ?? r;
+      if (l.semaine !== r.semaine || l.objectif !== r.objectif) return l.semaine >= r.semaine ? l : r;
+      // Même sprint modifié des deux côtés : on garde, pour chaque indicateur, le plus avancé.
+      return { ...l, kpis: l.kpis.map((k) => ({ ...k, fait: Math.max(k.fait, r.kpis.find((x) => x.id === k.id)?.fait ?? 0) })) };
+    }),
+    prospects: unionBy(bc.prospects, lc.prospects, rc.prospects, (x) => x.id, ts).map((p) => {
+      const l = lc.prospects.find((x) => x.id === p.id), r = rc.prospects.find((x) => x.id === p.id);
+      return l && r ? (l.maj >= r.maj ? l : r) : p;
+    }),
+  };
+
   return out;
 }
 

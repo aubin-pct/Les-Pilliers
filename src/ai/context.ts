@@ -8,7 +8,9 @@ import { GOALS, LEVELS } from "@/content/profile";
 import { TESTS } from "@/content/corps";
 import { bestOf, currentMission } from "@/engine/scoring";
 import { hesit } from "@/engine/insights";
-import type { Chantier, PillarId } from "@/engine/types";
+import type { Chantier, ChatScope, PillarId } from "@/engine/types";
+import { STAGES } from "@/content/capital";
+import { eloSkills } from "@/engine/eloquence";
 import { DAY, dayKey, f1, fdate } from "@/lib/format";
 
 const lvl = (id: string) => LEVELS.find((l) => l.id === id)?.label ?? id;
@@ -59,13 +61,21 @@ export function capitalContext(c: Chantier, now: number) {
     pilier: pillarState(c, "capital", now),
     euros_gagnes_seul: c.euros,
     mises_perdues_euros: c.stakesLost,
-    feuille_de_route: c.roadmap && { vision: c.roadmap.vision, paliers: c.roadmap.paliers.map((x, i) => `${i < c.roadmap!.index ? "✓" : i === c.roadmap!.index ? "→" : "·"} ${x.titre}`) },
-    mission_en_cours: M.done ? null : { titre: M.title, pourquoi: M.detail, preuve: M.proof, delai_jours: M.jours },
-    etapes_de_la_mission: c.missionSteps?.items ?? null,
-    missions_livrees: c.missions.slice(-8).map((m) => ({ date: fdate(m.ts), titre: m.title, montant: m.amount, preuve: m.proof })),
+    // Ancien système de missions : seulement tant qu'aucune piste n'est choisie.
+    ...(c.capital.thesis ? {} : {
+      feuille_de_route: c.roadmap && { vision: c.roadmap.vision, paliers: c.roadmap.paliers.map((x, i) => `${i < c.roadmap!.index ? "✓" : i === c.roadmap!.index ? "→" : "·"} ${x.titre}`) },
+      mission_en_cours: M.done ? null : { titre: M.title, pourquoi: M.detail, preuve: M.proof, delai_jours: M.jours },
+    }),
+    encaissements: c.missions.slice(-8).map((m) => ({ date: fdate(m.ts), titre: m.title, montant: m.amount })),
     actions_recentes: c.missionLog.slice(-12).map((l) => `${fdate(l.ts)} : ${l.text}`),
     concepts_examines: c.concepts.slice(-10).map((x) => ({ concept: x.c, note: x.note })),
     mise_en_cours: c.stake && { montant: c.stake.amount, echeance: fdate(c.stake.deadline) },
+    entretien_diagnostic: c.capital.interview,
+    piste_choisie: c.capital.thesis && { ...c.capital.thesis.option, objectif_mensuel_euros: c.capital.thesis.objectifMois, choisie_le: fdate(c.capital.thesis.ts) },
+    sprint_en_cours: c.capital.sprint && { semaine: c.capital.sprint.semaine, objectif: c.capital.sprint.objectif, indicateurs: c.capital.sprint.kpis.map((k) => `${k.label} : ${k.fait}/${k.cible}`) },
+    entonnoir_prospects: STAGES.map((s, i) => ({ etape: s, nombre: c.capital.prospects.filter((p) => p.stage === i).length })),
+    prospects_recents: c.capital.prospects.slice(-10).map((p) => ({ nom: p.nom, etape: STAGES[p.stage], note: p.note })),
+    encaissements_30j: c.missions.filter((m) => m.ts > now - 30 * DAY).reduce((a, m) => a + m.amount, 0),
     memoire_du_contremaitre: memory(c, "capital"),
   };
 }
@@ -81,6 +91,7 @@ export function espritContext(c: Chantier, now: number) {
     sujets_faibles: c.esprit.filter((e) => e.note < 6).slice(-8).map((e) => ({ sujet: e.topic, lacune: e.lacune })),
     repartition_par_domaine: byDomain,
     parcours_actif: activeParcours(c),
+    carte_du_savoir: c.knowledgeMap && c.knowledgeMap.domaines.map((d) => ({ domaine: d.nom, a_acquerir: d.sujets.filter((x) => !c.esprit.some((e) => e.topic === x.titre)).slice(0, 6).map((x) => x.titre) })),
     memoire_du_contremaitre: memory(c, "esprit"),
   };
 }
@@ -100,12 +111,31 @@ export function verbeContext(c: Chantier, now: number) {
       critique: o.verdict ? o.verdict.split("\n")[0] : undefined,
     })),
     sujets_recents: c.orals.slice(-15).map((o) => o.sujet),
+    competences_0_100: eloSkills(c),
+    exercices_recents: c.orals.slice(-8).map((o) => o.drill ?? "libre"),
     memoire_du_contremaitre: memory(c, "verbe"),
   };
 }
 
 export function pillarContext(c: Chantier, id: PillarId, now: number) {
   return { corps: corpsContext, capital: capitalContext, esprit: espritContext, verbe: verbeContext }[id](c, now);
+}
+
+/** Vue d'ensemble : les quatre piliers en une ligne chacun. */
+export function templeContext(c: Chantier, now: number) {
+  return {
+    prenom: c.profile?.prenom || undefined,
+    piliers: Object.fromEntries((["corps", "capital", "esprit", "verbe"] as PillarId[]).map((id) => [id, { ...pillarState(c, id, now), plancher_aujourdhui: !!c.days[dayKey(now)]?.[id], priorite: c.memoire[id]?.priorite }])),
+    comptes_a_rendre: c.pending.length,
+    excuses_30j: c.excuses.filter((e) => e.ts > now - 30 * DAY).length,
+    euros_gagnes_seul: c.euros,
+    piste_capital: c.capital.thesis?.option.nom,
+    heure: new Date(now).getHours(),
+  };
+}
+
+export function scopeContext(c: Chantier, scope: ChatScope, now: number) {
+  return scope === "temple" ? templeContext(c, now) : pillarContext(c, scope, now);
 }
 
 /** Excuses et victoires : ce qui sert à juger un manquement. */

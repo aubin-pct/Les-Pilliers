@@ -133,3 +133,68 @@ Format : texte brut, sans markdown, sans astérisques, 170 mots maximum.
 
 export const testKeyPrompt = `[TACHE:test]
 Test de connexion. Réponds uniquement en JSON : {"ok": true, "phrase": string (une phrase de bienvenue dure, 12 mots max)}`;
+
+/* ======================= v5 : le Coach incarné ======================= */
+
+export const chatPrompt = (p: { section: string; ctx: unknown; actions: string; history: { from: string; text: string }[]; message: string }) => `[TACHE:chat]
+${dossier(p.ctx)}
+SECTION OUVERTE : ${p.section}
+ACTIONS QUE TU PEUX DÉCLENCHER (0 à 3, uniquement celles-ci, paramètres exacts) :
+${p.actions}
+CONVERSATION (la plus récente en dernier) : ${j(p.history)}
+NOUVEAU MESSAGE DE L'UTILISATEUR : « ${p.message} »
+
+Règles : tu es dans une vraie conversation. Réponds en 1 à 4 phrases courtes, 60 mots maximum, sans liste ni titre. Appuie-toi sur ses chiffres. S'il te manque une information pour bien l'aider, pose UNE question. S'il t'apprend quelque chose de durable sur lui (blessure, compétence, contrainte, objectif), propose l'action « profil » pour l'enregistrer. Propose une action seulement si elle sert vraiment maintenant.
+Réponds uniquement en JSON : {"reponse": string, "actions": [{"label": string (4 mots max, à l'impératif), "type": string, "params": object}]}`;
+
+export const briefPrompt = (ctx: unknown) => `[TACHE:brief]
+${dossier(ctx)}
+Écris ton BRIEF DU JOUR : une phrase par section, 12 mots maximum chacune, qui dit la chose la plus utile à faire aujourd'hui dans cette section, chiffrée si possible. Ton sec. Pas de salutation.
+Réponds uniquement en JSON : {"temple": string, "corps": string, "capital": string, "esprit": string, "verbe": string}`;
+
+/* ======================= v5 : Capital ======================= */
+
+export const interviewPrompt = (ctx: unknown, qa: { q: string; a: string }[]) => `[TACHE:diagnostic]
+${dossier(ctx)}
+ENTRETIEN JUSQU'ICI : ${j(qa)}
+Tu mènes l'entretien de diagnostic qui servira à construire SON activité rentable. Il faut comprendre en profondeur : ce qu'il sait faire de rare (pas les compétences banales), pour qui ça a de la valeur, qui il connaît déjà (école, entreprise, famille, communautés), son temps réel et ses créneaux, ses contraintes (contrat d'alternance, clause d'exclusivité, statut étudiant, matériel), son budget, ce qu'on lui demande déjà spontanément, son ambition chiffrée et son échéance.
+Pose UNE question à la fois, précise et concrète ; si la réponse précédente est vague, creuse-la au lieu de passer à autre chose. 6 à 9 questions au total. Quand c'est utile, propose 2 à 5 réponses courtes possibles. Quand tu en sais assez, réponds "fini": true et une question vide.
+Réponds uniquement en JSON : {"question": string, "choix": [string], "fini": boolean}`;
+
+export const optionsPrompt = (ctx: unknown, demande: string) => `[TACHE:pistes]
+${dossier(ctx)}
+${demande ? `Retour de l'utilisateur sur les pistes précédentes : « ${demande} »\n` : ""}
+Propose 3 PISTES D'ACTIVITÉ réellement différentes, bâties sur ses atouts RARES révélés par l'entretien. Pour chacune : une cible précise et atteignable par lui (secteur, taille, ville ou communauté, rôle de la personne qui paie), un canal d'acquisition qu'il peut activer CETTE SEMAINE avec son réseau réel, une offre packagée au résultat clair, un prix chiffré, et pourquoi lui précisément peut gagner. Interdits : revente d'objets, dropshipping, trading, crypto, paris, « automatiser une tâche simple », toute formule vague ou générique, tout ce qui contredit ses contraintes (alternance, exclusivité, temps, budget). Notes de 1 à 10, honnêtes et différenciées. premierEuroJours = délai réaliste avant le premier paiement ; potentielMois = revenu mensuel réaliste dans 12 mois, en euros.
+Réponds uniquement en JSON : {"options": [{"nom": string (3 mots), "offre": string, "cible": string, "canal": string, "prix": string, "pourquoiToi": string, "premierEuroJours": number, "potentielMois": number, "scores": {"marche": number, "competence": number, "vitesse": number, "echelle": number}}]}`;
+
+export const sprintPrompt = (ctx: unknown) => `[TACHE:sprint]
+${dossier(ctx)}
+Construis le SPRINT DE CETTE SEMAINE pour sa piste choisie : un objectif chiffré atteignable en 7 jours avec son temps réel, 3 à 5 indicateurs d'action mesurables (des nombres : messages envoyés, appels, rendez-vous, devis, publications…), et le message EXACT à envoyer à un prospect, prêt à copier, adapté au canal, 90 mots maximum, signé de son prénom. Tiens compte du sprint précédent et de l'entonnoir de prospects : objectif atteint → on monte ; raté → on corrige la cause.
+Réponds uniquement en JSON : {"objectif": string, "kpis": [{"label": string (5 mots max), "cible": number}], "script": string}`;
+
+/* ======================= v5 : Esprit ======================= */
+
+export const mapPrompt = (ctx: unknown) => `[TACHE:carte_savoir]
+${dossier(ctx)}
+Construis SA CARTE DU SAVOIR : pour chacun de ses domaines choisis, 8 à 12 sujets essentiels qui structurent le domaine (les notions et événements qui permettent de comprendre tout le reste, pas des anecdotes), formulés précisément (6 à 10 mots), avec un niveau : 1 = socle, 2 = approfondissement, 3 = expert. Reprends à l'identique les sujets déjà traités qui sont essentiels.
+Réponds uniquement en JSON : {"domaines": [{"nom": string, "sujets": [{"titre": string, "niveau": 1|2|3}]}]}`;
+
+/* ======================= v5 : Verbe ======================= */
+
+export const drillPrompt = (ctx: unknown, type: string, description: string) => `[TACHE:exercice_oral]
+${dossier(ctx)}
+Exercice : « ${type} » — ${description}
+Donne le contenu de cet exercice, adapté à son contexte (soutenances, entretiens…) et à ses faiblesses mesurées :
+- "sujet" : la consigne d'oral (1 phrase, à la 2e personne) si l'exercice en demande une ;
+- "texte" : le texte à lire à voix haute (lecture : 90 à 140 mots, avec des ruptures de ton, des chiffres, une question) ou 3 virelangues séparés par des retours à la ligne (articulation) ;
+- "question" : une question piège réaliste de son contexte (question piège) ;
+- "conseil" : une technique précise à appliquer pendant l'exercice (1 phrase).
+Laisse vide ce qui ne s'applique pas. Réponds uniquement en JSON : {"sujet": string, "texte": string, "question": string, "conseil": string}`;
+
+export const oral2Prompt = (ctx: unknown, p: { drill: string; consigne: string; secs: number; mesures: unknown; text: string }) => `[TACHE:coach_oral]
+${dossier(ctx)}
+Tu joues LE COACH D'ÉLOQUENCE. Exercice « ${p.drill} », consigne : « ${p.consigne} », ${p.secs} secondes.
+Mesures objectives : ${j(p.mesures)}
+Transcription (dictée automatique, ponctuation approximative, certains « euh » peuvent manquer) : « ${p.text} »
+Note sur 100 la structure (accroche, progression, chute) et l'impact (clarté, conviction, images). Compare à ses oraux précédents. Verdict très court.
+Réponds uniquement en JSON : {"structure": number, "impact": number, "verdict": string (2 phrases sèches), "a_corriger": string (LE point à corriger au prochain essai, 1 phrase), "phrase_refaite": string (sa phrase la plus faible, réécrite pour frapper)}`;

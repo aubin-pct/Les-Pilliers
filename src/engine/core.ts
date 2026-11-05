@@ -17,9 +17,11 @@ export function freshChantier(now: number): Chantier {
     concepts: [], esprit: [], orals: [], hist: [], wins: [], skips: 0, report: null,
     profile: null, plans: emptyPlans(), roadmap: null, missionSteps: null, concept: null,
     espritChoice: null, parcours: [], parcoursActif: null, memoire: {},
+    chats: {}, brief: null, capital: emptyCapital(), knowledgeMap: null,
   };
 }
 
+export const emptyCapital = (): Chantier["capital"] => ({ interview: [], ask: null, diagDone: false, options: null, thesis: null, sprint: null, prospects: [] });
 export const emptyPlans = (): Chantier["plans"] => ({ programme: null, seance: null, espritProps: null, verbe: null });
 
 /**
@@ -32,6 +34,10 @@ export function normalize(c: Partial<Chantier> | { v?: number }, now = Date.now(
   out.v = 2;
   out.plans = { ...emptyPlans(), ...(out.plans ?? {}) };
   out.memoire = out.memoire ?? {};
+  out.chats = out.chats ?? {};
+  out.brief = out.brief ?? null;
+  out.knowledgeMap = out.knowledgeMap ?? null;
+  out.capital = { ...emptyCapital(), ...(out.capital ?? {}) };
   PILLAR_IDS.forEach((id) => { if (!out.p[id]) out.p[id] = { s: START_HEIGHT, last: now }; });
   return out;
 }

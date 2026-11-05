@@ -15,19 +15,27 @@ Mémoire du Contremaître (bilan IA par pilier) ──────────�
         └────────────── bilan hebdomadaire (Memory.tsx) ◄──── plans stockés dans le chantier ◄──┘ (un seul nouvel essai si invalide)
 ```
 
-- **Profil** (`chantier.profile`, formulaires `features/profil/ProfileForms.tsx`) : objectifs, niveau, mensurations, matériel, temps (Corps) ; situation, compétences, ressources, heures, budget, risque, intérêts, objectif, déjà tenté, refus (Capital) ; domaines, niveau, motivation (Esprit) ; contexte et défauts (Verbe). `profile.updated === 0` = accueil inachevé : l'appli affiche `Onboarding` (clé → 4 formulaires → génération des 4 plans en parallèle par `planner.ts`).
+- **Profil** (`chantier.profile`, formulaires `features/profil/ProfileForms.tsx`) : objectifs, niveau, mensurations, matériel, temps (Corps) ; situation, compétences, ressources, heures, budget, risque, intérêts, objectif, déjà tenté, refus (Capital) ; domaines, niveau, motivation (Esprit) ; contexte et défauts (Verbe). `profile.updated === 0` = accueil inachevé : l'appli affiche `Onboarding` (clé → 4 formulaires → génération en parallèle par `planner.ts` : programme, première question du diagnostic Capital, carte du savoir, sujets d'Esprit).
 - **Preuves** : la séance garde chaque série faite face à la cible (`Seance.logs`), le ressenti (`rpe` 1–10) et une note ; le Capital garde chaque action, étape cochée, blocage ; l'Esprit garde le domaine de chaque sujet.
-- **Mémoire** (`chantier.memoire[pilier]` : synthèse, forces, faiblesses, priorité) : régénérée automatiquement en arrière-plan quand elle a plus de 7 jours et qu'au moins 3 nouvelles preuves sont arrivées (`useAutoMemory`, un essai par heure au plus), ou via « Faire le bilan maintenant ». Elle entre dans tous les dossiers et s'affiche en tête de chaque pilier (`MemoryNote`).
+- **Mémoire** (`chantier.memoire[pilier]` : synthèse, forces, faiblesses, priorité) : régénérée automatiquement en arrière-plan quand elle a plus de 7 jours et qu'au moins 3 nouvelles preuves sont arrivées (`useAutoMemory`, un essai par heure au plus), ou via « Refaire le bilan » (Temple, « Ce qu'il sait de toi »). Elle entre dans tous les dossiers, donc dans le brief et la conversation du Coach.
 - **Plans** (`chantier.plans`, `roadmap`, `missionSteps`, `concept`, `espritChoice`, `parcours`) : stockés avec leur date, régénérés à la demande ou au premier affichage du jour (sujets d'Esprit et d'oral, concept, plan d'attaque).
 - **Ajouter une donnée** : la stocker dans le chantier (type dans `engine/types.ts`, valeur par défaut dans `freshChantier`), puis l'exposer dans la fonction de contexte du pilier (`ai/context.ts`). Toutes les consignes en profitent.
 - **Ajouter une génération** : schéma dans `schemas.ts`, consigne dans `prompts.ts` (étiquette `[TACHE:nom]` en première ligne, mot « JSON »), fonction dans `contremaitre.ts` via `ask(prompt, schema)`.
 
+## Le Coach (v5) : l'IA incarnée
+
+L'application parle par la voix du Contremaître. Chaque page commence par son visage (`features/coach/Avatar.tsx` : masque de pierre, regard dans la couleur du pilier, bouche en barres de son ; états repos, réflexion, parole, écoute) et **une seule phrase** (`CoachHead`) : le brief IA du jour (`genBrief`, une génération par jour, `chantier.brief`) tant que le plancher n'est pas posé, sinon une phrase locale chiffrée (`engine/coachLines.ts`). Toucher la bulle ouvre la conversation ; un bouton flottant (`CoachFab`) prend le relais quand la tête sort de l'écran.
+
+- **Conversation** (`CoachPanel.tsx`) : une par section (`chantier.chats[scope]`, 40 messages, synchronisée). Le Coach reçoit le dossier de la section ouverte (`scopeContext`), répond en 60 mots au plus et propose jusqu'à 3 **actions** exécutables d'un geste. Dictée (`lib/voice.ts`, reconnaissance vocale) et voix (synthèse fr-FR, réglage `settings.voice`).
+- **Actions** (`ai/actions.ts`) : liste blanche décrite à l'IA et filtrée au retour (`ouvrir`, `profil`, `seance`, `programme`, `pistes`, `sprint`, `prospect`, `etudier`, `parcours`, `carte`, `exercice`). Elles appellent les mêmes opérations que les boutons (`ai/ops.ts`). `profil` ne touche qu'aux champs de `EDITABLE`, avec contrôle de type.
+- **Règle** : un écran = une action principale, des chiffres et des formes ; tout le reste dans des `<Fold>` repliés. Pas de paragraphe d'explication : si c'est utile, le Coach le dit.
+
 ## Ce que fait chaque pilier
 
-- **Corps** : programme hebdomadaire (`genProgramme`, ajustable par une demande libre) ; séance du jour préparée selon les conditions (temps, énergie, matériel du jour, douleur, envie) et l'historique (surcharge progressive, séries échouées, effort ≥ 9) ; exécution guidée : saisie série par série (persistée dans `plans.seance.faits`), minuteur de repos, « Tout réussi », alternative plus facile, ressenti final ; validation à 5 min de chrono et la moitié des séries. Tests étalons inchangés. Séance de secours sans IA.
-- **Capital** : feuille de route personnelle de 6 à 8 paliers (`genRoadmap`, refaisable avec un retour libre ; l'index repart à 0, l'historique reste) ; plan d'attaque de la mission (étapes cochables, chaque étape = action du jour) ; « Je bloque » (diagnostic + action sous 24 h, consigné au journal) ; « Changer de mission » (le Contremaître juge la raison et remplace le palier) ; concept du jour choisi pour la mission, avec une question chiffrée ; livraison avec photo, mise d'honneur.
-- **Esprit** : chaque jour, choix entre 3 propositions adaptées (domaines, niveau, sujets faibles, jamais déjà traités), la suite du parcours actif, de nouvelles propositions selon une envie, ou un sujet libre ; fiche d'apprentissage facultative avant d'expliquer (l'Examinateur exige alors d'aller au-delà) ; parcours thématiques de 6 à 10 sujets (plusieurs possibles, un actif) ; révisions espacées inchangées.
-- **Verbe** : 3 sujets d'oral du jour choisis selon le contexte déclaré et les faiblesses mesurées ; « Changer de sujet » passe au suivant (coûte 1 assise) ; le coaching compare aux oraux précédents.
+- **Corps** : séance du jour préparée selon minutes et énergie (matériel, douleur, envie repliés), programme de la semaine en bandeau, exécution plein écran série par série, tests étalons en tuiles, journal replié.
+- **Capital** (`chantier.capital`) : 1. **diagnostic** mené par le Coach, une question à la fois avec réponses suggérées (`interviewStep`, 6 à 9 questions : atouts rares, réseau, temps, contraintes d'alternance, ambition chiffrée) ; 2. **trois pistes** chiffrées et notées (prix, délai du premier euro, potentiel mensuel, barres marché/toi/vitesse/échelle ; interdits : revente, dropshipping, trading, crypto, « automatiser une tâche simple », le vague) ; 3. une fois la piste choisie avec un objectif mensuel : **anneau des encaissements du mois**, **sprint hebdomadaire** (`weekKey`, objectif, indicateurs +1 qui posent le plancher, message prêt à copier), **entonnoir de prospects** (`STAGES`, le passage à « Payé » ouvre l'encaissement avec capture obligatoire), concept du jour réduit à une ligne. L'ancienne feuille de route n'est plus affichée ; ses données restent.
+- **Esprit** : **carte du savoir** en pseudo-3D (`KnowledgeMap.tsx`, canvas) : domaines en constellations, sujets acquis (taille et éclat selon la note), gravés (anneau laiton), à réviser (anneau rouge), à acquérir (pointillés) ; rotation automatique et au doigt, toucher une étoile l'ouvre (en faire le sujet du jour, demander au Coach). Carte générée par l'IA (`genMap`, `chantier.knowledgeMap`) ou construite localement. Barres de maîtrise par domaine. Sujet du jour en un geste, fiche en cartes numérotées, explication dictable.
+- **Verbe** : salle d'entraînement. Radar des 6 compétences (`EloSkill` : structure, fluidité, rythme, voix, vocabulaire, impact ; `engine/eloquence.ts`, moyenne des 6 dernières mesures, pointillé = avant). Exercice conseillé sur la compétence la plus faible + 8 autres (`DRILLS` : zéro tic, PREP guidé, silences, lecture expressive, articulation, mots imposés, question piège, oral libre, refais-le). `DrillSession.tsx` : préparation (contenu IA `genDrill` ou de secours), 3-2-1, direct (chaque tic sonne et clignote, jauge de débit, vivacité de la voix par hauteur `detectPitch` et volume, étapes, silences comptés, mots qui s'allument), résultat (score, compétences, verdict `coachOral2` : à corriger, mieux dit) et « Refais-le » qui compare à l'essai précédent.
 
 ## Pile technique
 
@@ -61,7 +69,7 @@ Règle : le moteur (`engine/`) ne dépend ni de React ni du navigateur (sauf typ
 
 Tout se fait dans `src/content/`, sans toucher au moteur :
 - `esprit.ts` : `TOPICS` (titre + domaine). Le sujet du jour tourne entre les domaines (`DOMAINS`) et ne repropose jamais un sujet déjà traité.
-- `verbe.ts` : `SUBJECTS` (texte + type), `TICS`, durées et seuils de la Tribune.
+- `verbe.ts` : `SUBJECTS`, `TICS`, `DRILLS` (exercices : compétence, durée, consigne pour l'IA, étapes), contenus de secours (`VIRELANGUES`, `LECTURES`, `MOTS`, `PIEGES`).
 - `capital.ts` : `LADDER` (échelle de 8 missions, `cash` = montant exigé) et `CONCEPTS`.
 - `corps.ts` : `TESTS` (mode de mesure : `nez`, `chrono`, `minuteur`, `saisie`) et `SEANCES` (doses `{p}` pompes, `{d}` dips, `{g}` gainage, `{s}` squats, `{e}` pompes explosives, calculées dans `todaySeance`).
 - `pillars.ts` : taux d'érosion, planchers, pénalité de minuit.
@@ -107,7 +115,7 @@ Entrées de page et de cartes par translation seule (jamais d'opacité de dépar
 
 - Thème sombre unique. Couleurs uniquement via les variables de `:root` : `--c-corps`, `--c-capital`, `--c-esprit`, `--c-verbe`, `--brass` (ce qui se gagne), `--blood` (ce qui se perd). Polices : Big Shoulders Display (titres), Archivo (texte), IBM Plex Mono (chiffres, voix du Contremaître).
 - Gouttière de 16 px, zones sûres `env(safe-area-inset-*)`, champs en 16 px contre le zoom d'iOS, colonne max 520 px.
-- Panneaux : `<Sheet>` ; le bouton retour d'Android ferme la couche du dessus grâce à `lib/layers.ts` (le compteur de pompes l'utilise aussi). Ne pas manipuler `history` ailleurs.
+- Panneaux : `<Sheet>` ; le bouton retour d'Android ferme la couche du dessus grâce à `lib/layers.ts` (compteur de pompes, conversation du Coach et séance d'éloquence aussi). Si on navigue pendant qu'une couche est ouverte (action « ouvrir » du Coach), la fermer ne revient pas en arrière. Ne pas manipuler `history` ailleurs.
 - Pas de `alert`/`confirm`/`prompt`. Action massive (« Tout effacer ») : confirmation en deux temps.
 - Le Contremaître parle sec et court. Les erreurs disent quoi faire, en une phrase.
 
@@ -116,7 +124,8 @@ Entrées de page et de cartes par translation seule (jamais d'opacité de dépar
 - `features/verbe/recorder.ts` (`Capture`) : `getUserMedia` → `MediaRecorder` (archive), `AnalyserNode` échantillonné toutes les 50 ms, `SpeechRecognition` fr-FR continue relancée à chaque `end`. Si la reconnaissance échoue, l'oral est jugé sur la voix seule (25 s de voix au lieu de 40 mots).
 - `engine/analysis.ts` : `analyzeAudio` (seuil adaptatif, blancs ≥ 0,8 s, enveloppe de 72 points) et `analyzeText` (mots/min, tics, diversité). Métrique principale : hésitations/min = tics/min + blancs/min.
 - Mode clavier : dictée du clavier dans une zone de texte, sans enregistrement ; bascule automatique si le micro est refusé.
-- Crochet de test : `window.__tribune = { secs, inject }` raccourcit l'oral et injecte une transcription.
+- Crochet de test : `window.__tribune = { secs, inject }` raccourcit l'exercice et injecte une transcription.
+- `Capture` mesure aussi la hauteur de la voix à chaque trame (`pitch`), pour la vivacité en direct et `pitchVar`/`volVar`.
 
 ## Le Contremaître IA
 

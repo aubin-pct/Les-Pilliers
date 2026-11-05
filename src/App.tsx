@@ -18,6 +18,9 @@ import { VerbeView } from "@/features/verbe/VerbeView";
 import { ReglagesView } from "@/features/reglages/ReglagesView";
 import { Onboarding } from "@/features/profil/Onboarding";
 import { ProfilView } from "@/features/profil/ProfilView";
+import { CoachFab, CoachPanel } from "@/features/coach/CoachPanel";
+import { useDailyBrief } from "@/features/coach/CoachHead";
+import { useAutoMemory } from "@/features/temple/Memory";
 
 /** Érosion vivante : un tic toutes les 30 s et au retour sur l'appli. */
 function useEngineClock() {
@@ -130,7 +133,9 @@ export function App() {
   useEngineClock();
   useAccent();
   useEffect(() => startAutoSync(), []);
+  useDailyBrief();
   const c = useChantier();
+  useAutoMemory(c);
   const demo = useIsDemo();
   const nav = useNavigate();
   const loc = useLocation();
@@ -173,6 +178,8 @@ export function App() {
         </div>
       </main>
       {c && <TabBar />}
+      {c && <CoachFab />}
+      {c && <CoachPanel />}
       <Toast />
       <Stamp />
     </>

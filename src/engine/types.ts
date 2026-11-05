@@ -90,6 +90,41 @@ export interface Plans {
   verbe: { date: string; items: SubjectAI[]; index: number } | null;
 }
 
+/* ---------- Le Coach : conversation par section ---------- */
+
+export type ChatScope = "temple" | PillarId;
+export interface CoachAction { label: string; type: string; params: Record<string, unknown> }
+export interface ChatMsg { ts: number; from: "coach" | "moi"; text: string; actions?: CoachAction[] }
+
+/* ---------- Capital v2 : diagnostic, pistes, sprint, prospects ---------- */
+
+export interface BizOption {
+  id: string; nom: string; offre: string; cible: string; canal: string; prix: string;
+  pourquoiToi: string; premierEuroJours: number; potentielMois: number;
+  scores: { marche: number; competence: number; vitesse: number; echelle: number };
+}
+export interface Sprint { semaine: string; objectif: string; kpis: { id: string; label: string; cible: number; fait: number }[]; script: string }
+export interface Prospect { id: string; nom: string; stage: number; note: string; ts: number; maj: number }
+export interface CapitalPlan {
+  interview: { q: string; a: string }[];
+  /** Question du diagnostic en attente de réponse. */
+  ask: { q: string; choix: string[] } | null;
+  /** Diagnostic terminé (le Coach en sait assez). */
+  diagDone: boolean;
+  options: BizOption[] | null;
+  thesis: { ts: number; option: BizOption; objectifMois: number } | null;
+  sprint: Sprint | null;
+  prospects: Prospect[];
+}
+
+/* ---------- Esprit v2 : carte du savoir ---------- */
+
+export interface KnowledgeMap { ts: number; domaines: { nom: string; sujets: { titre: string; niveau: number }[] }[] }
+
+/* ---------- Verbe v2 : compétences d'éloquence ---------- */
+
+export type EloSkill = "structure" | "fluidite" | "rythme" | "voix" | "vocabulaire" | "impact";
+
 /** Mémoire du Contremaître : sa lecture d'un pilier, mise à jour par l'IA à partir des données. */
 export interface Memoire { ts: number; synthese: string; forces: string[]; faiblesses: string[]; priorite: string }
 
@@ -131,6 +166,12 @@ export interface Oral {
   audio: boolean;
   verdict: string;
   structure: number | null;
+  /** v5 : exercice, variations de voix, précision (articulation), scores par compétence (0-100). */
+  drill?: string;
+  pitchVar?: number | null;
+  volVar?: number | null;
+  accuracy?: number | null;
+  skills?: Partial<Record<EloSkill, number>>;
 }
 
 export interface HistRow { d: string; corps: number; capital: number; esprit: number; verbe: number }
@@ -175,6 +216,11 @@ export interface Chantier {
   parcours: Parcours[];
   parcoursActif: string | null;
   memoire: Partial<Record<PillarId, Memoire>>;
+  /* v5 : le Coach, le Capital v2, la carte du savoir */
+  chats: Partial<Record<ChatScope, ChatMsg[]>>;
+  brief: { date: string; lines: Partial<Record<ChatScope, string>> } | null;
+  capital: CapitalPlan;
+  knowledgeMap: KnowledgeMap | null;
 }
 
 export interface GainResult { real: number; halved: boolean }
@@ -189,4 +235,6 @@ export interface Settings {
   /** Serveur de synchronisation (Docker sur le Mac), vide = pas de synchronisation. */
   syncUrl: string;
   syncToken: string;
+  /** Le Coach parle à voix haute (synthèse vocale). */
+  voice: boolean;
 }
