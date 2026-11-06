@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PILLAR, PILLAR_IDS } from "@/content/pillars";
-import { TESTS } from "@/content/corps";
+import { CORE_TESTS } from "@/content/corps";
 import { doneToday, streak, totalHeight, weekDelta } from "@/engine/core";
 import { localReport, weekData } from "@/engine/insights";
 import { weeklyReport } from "@/ai/contremaitre";
@@ -37,7 +37,7 @@ export function TempleView() {
   const zero = [
     { ok: aiEnabled(settings), t: "Clé DeepSeek", to: "/reglages" },
     { ok: profileGaps(c.profile).length === 0, t: "Profil complet", to: "/profil" },
-    { ok: TESTS.every((T) => c.tests.some((t) => t.kind === T.id)), t: "4 tests étalons", to: "/corps" },
+    { ok: CORE_TESTS.every((T) => c.tests.some((t) => t.kind === T.id)), t: `${CORE_TESTS.length} tests étalons`, to: "/corps" },
     { ok: c.capital.thesis !== null, t: "Piste Capital", to: "/capital" },
     { ok: c.esprit.length > 0, t: "1er sujet", to: "/esprit" },
     { ok: c.orals.length > 0, t: "1er oral", to: "/verbe" },

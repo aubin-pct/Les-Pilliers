@@ -86,6 +86,15 @@ describe("fusion v5", () => {
     expect(m.chats.capital!.map((x) => x.text)).toEqual(["a", "b"]);
     expect(m.capital.prospects.map((p) => p.nom).sort()).toEqual(["Léa", "Marc"]);
   });
+  it("une conversation effacée sur un appareil ne revient pas par l'autre", () => {
+    const { base, mac, phone } = setup();
+    const msgs = [{ ts: T0 - 10, from: "moi" as const, text: "a" }, { ts: T0 - 5, from: "coach" as const, text: "b" }];
+    base.chats.corps = msgs; mac.chats.corps = [...msgs, { ts: T0 - 1, from: "moi" as const, text: "c" }];
+    phone.chats.corps = []; phone.chatReset = { corps: T0 - 3 };
+    const m = mergeChantier(base, phone, mac, T0);
+    expect(m.chats.corps!.map((x) => x.text)).toEqual(["c"]);
+    expect(m.chatReset!.corps).toBe(T0 - 3);
+  });
   it("garde la carte du savoir la plus récente", () => {
     const { base, mac, phone } = setup();
     mac.knowledgeMap = { ts: 10, domaines: [{ nom: "A", sujets: [] }] };

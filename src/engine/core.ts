@@ -35,6 +35,7 @@ export function normalize(c: Partial<Chantier> | { v?: number }, now = Date.now(
   out.plans = { ...emptyPlans(), ...(out.plans ?? {}) };
   out.memoire = out.memoire ?? {};
   out.chats = out.chats ?? {};
+  out.chatReset = out.chatReset ?? {};
   out.brief = out.brief ?? null;
   out.knowledgeMap = out.knowledgeMap ?? null;
   out.capital = { ...emptyCapital(), ...(out.capital ?? {}) };

@@ -23,7 +23,7 @@ export function buildDemo(now: number, N = 47): Chantier {
   const c = freshChantier(startOfDay(now) - N * DAY + 7 * 3600e3);
   c.p.corps.s = 14; c.p.capital.s = 6; c.p.esprit.s = 12; c.p.verbe.s = 8;
   let ei = 0, wpm = 104, tics = 7.2, blanks = 6.5;
-  const best: Record<TestId, number> = { pompes: 17, gainage: 68, squats: 36, souplesse: -7 };
+  const best: Record<TestId, number> = { pompes: 17, tractions: 6, gainage: 68, squats: 36, souplesse: -7 };
   for (let i = N; i >= 1; i--) {
     const dStart = startOfDay(now) - i * DAY;
     const morning = dStart + 7.5 * 3600e3;
@@ -42,7 +42,7 @@ export function buildDemo(now: number, N = 47): Chantier {
     if (last || rnd() < 0.82) {
       if (day % 7 === 3) {
         const k = (["pompes", "gainage", "squats", "souplesse"] as TestId[])[Math.floor(day / 7) % 4];
-        const inc = { pompes: 2 + Math.round(rnd() * 2), gainage: 8 + Math.round(rnd() * 10), squats: 2 + Math.round(rnd() * 3), souplesse: 1 + Math.round(rnd()) }[k];
+        const inc = { pompes: 2 + Math.round(rnd() * 2), tractions: 1, gainage: 8 + Math.round(rnd() * 10), squats: 2 + Math.round(rnd() * 3), souplesse: 1 + Math.round(rnd()) }[k];
         const v = rnd() < 0.18 ? best[k] - 1 : best[k] + inc;
         if (!c.tests.some((x) => x.kind === k)) applyTest(c, k, best[k] - inc, t - 3 * DAY, k === "pompes");
         best[k] = Math.max(best[k], v);

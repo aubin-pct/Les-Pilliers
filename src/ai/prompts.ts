@@ -142,15 +142,16 @@ Test de connexion. Réponds uniquement en JSON : {"ok": true, "phrase": string (
 
 /* ======================= v5 : le Coach incarné ======================= */
 
-export const chatPrompt = (p: { section: string; ctx: unknown; actions: string; history: { from: string; text: string }[]; message: string }) => `[TACHE:chat]
+export const chatPrompt = (p: { section: string; base: unknown; ctx: unknown; actions: string; history: { de: string; quand: string; texte: string }[]; message: string }) => `[TACHE:chat]
+QUI IL EST (toujours valable) : ${j(p.base)}
 ${dossier(p.ctx)}
 SECTION OUVERTE : ${p.section}
 ACTIONS QUE TU PEUX DÉCLENCHER (0 à 3, uniquement celles-ci, paramètres exacts) :
 ${p.actions}
-CONVERSATION (la plus récente en dernier) : ${j(p.history)}
+CONVERSATION EN COURS AVEC LUI (la plus récente en dernier ; « coach » = toi) : ${p.history.length ? j(p.history) : "aucune, c'est le début"}
 NOUVEAU MESSAGE DE L'UTILISATEUR : « ${p.message} »
 
-Règles : tu es dans une vraie conversation. Réponds en 1 à 4 phrases courtes, 60 mots maximum, sans liste ni titre. Appuie-toi sur ses chiffres. S'il te manque une information pour bien l'aider, pose UNE question. S'il t'apprend quelque chose de durable sur lui (blessure, compétence, contrainte, objectif), propose l'action « profil » pour l'enregistrer. Propose une action seulement si elle sert vraiment maintenant.
+Règles : tu es dans une vraie conversation qui continue : appuie-toi sur ce qui a déjà été dit (même il y a plusieurs heures), ne repose pas une question à laquelle il a répondu, ne te représente pas. Réponds en 1 à 4 phrases courtes, 60 mots maximum, sans liste ni titre. Appuie-toi sur ses chiffres. S'il te manque une information pour bien l'aider, pose UNE question. S'il t'apprend quelque chose de durable sur lui (blessure, compétence, contrainte, objectif), propose l'action « profil » pour l'enregistrer ; s'il te donne une performance mesurable, propose l'action qui l'enregistre. N'invente jamais d'action ni de paramètre hors de la liste. Propose une action seulement si elle sert vraiment maintenant.
 Réponds uniquement en JSON : {"reponse": string, "actions": [{"label": string (4 mots max, à l'impératif), "type": string, "params": object}]}`;
 
 export const briefPrompt = (ctx: unknown) => `[TACHE:brief]

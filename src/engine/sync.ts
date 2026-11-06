@@ -117,9 +117,11 @@ export function mergeChantier(baseIn: Chantier, localIn: Chantier, remoteIn: Cha
   out.seanceStart = pick(base.seanceStart, local.seanceStart, remote.seanceStart);
 
   // v5 : conversations, brief, Capital v2, carte du savoir.
-  out.chats = {};
+  out.chats = {}; out.chatReset = {};
   for (const k of ["temple", ...PILLAR_IDS] as const) {
-    const m = unionBy(base.chats[k] ?? [], local.chats[k] ?? [], remote.chats[k] ?? [], (x) => `${x.ts}|${x.from}`, ts, 60);
+    const cut = Math.max(local.chatReset?.[k] ?? 0, remote.chatReset?.[k] ?? 0);
+    if (cut) out.chatReset[k] = cut;
+    const m = unionBy(base.chats[k] ?? [], local.chats[k] ?? [], remote.chats[k] ?? [], (x) => `${x.ts}|${x.from}`, ts, 60).filter((x) => x.ts > cut);
     if (m.length) out.chats[k] = m;
   }
   out.brief = pick(base.brief, local.brief, remote.brief, (l, r) => ((l?.date ?? "") >= (r?.date ?? "") ? l : r));

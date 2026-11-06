@@ -26,7 +26,7 @@ export function localLine(c: Chantier, scope: ChatScope, now: number): string {
     case "corps": {
       if (doneToday(c, "corps", now)) {
         const t = TESTS.find((T) => bestOf(c, T.id) !== null);
-        return t ? `Posé. Prochain cap : battre ${bestOf(c, t.id)} ${t.unit} au ${t.name.toLowerCase()}.` : "Posé. Passe un test étalon : c'est lui qui fait monter.";
+        return t ? `Posé. Prochain cap, ${t.name.toLowerCase()} : plus de ${bestOf(c, t.id)} ${t.unit}.` : "Posé. Passe un test étalon : c'est lui qui fait monter.";
       }
       const p = c.plans.seance?.date === today ? c.plans.seance : null;
       return p ? `${p.titre}. ${p.duree} minutes. Lance.` : `Pas de séance aujourd'hui. ${c.profile?.corps.minutes ?? 40} minutes, maintenant.`;

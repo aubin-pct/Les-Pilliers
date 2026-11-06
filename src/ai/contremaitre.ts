@@ -13,7 +13,7 @@ import type { Chantier, ChatMsg, ChatScope, PillarId } from "@/engine/types";
 import { AIError, callModel, type CallOptions } from "./client";
 import * as P from "./prompts";
 import * as S from "./schemas";
-import { capitalContext, corpsContext, espritContext, excuseContext, pillarContext, scopeContext, templeContext, verbeContext } from "./context";
+import { baseContext, capitalContext, corpsContext, espritContext, excuseContext, pillarContext, scopeContext, templeContext, verbeContext } from "./context";
 
 export function aiReady() {
   const s = useStore.getState();
@@ -95,8 +95,14 @@ export async function testKey() {
 
 /* ---------------- v5 : le Coach ---------------- */
 const SECTION: Record<ChatScope, string> = { temple: "Le Temple (vue d'ensemble)", corps: "Corps", capital: "Capital", esprit: "Esprit", verbe: "Verbe (éloquence)" };
-export const chat = (scope: ChatScope, actions: string, history: ChatMsg[], message: string) =>
-  ask(P.chatPrompt({ section: SECTION[scope], ctx: scopeContext(chantier()!, scope, now()), actions, history: history.slice(-12).map((m) => ({ from: m.from === "coach" ? "toi" : "lui", text: m.text })), message }), S.ChatSchema, { max: 700 });
+const quand = (ts: number, t: number) => { const m = Math.round((t - ts) / 60000); return !ts ? "à l'ouverture" : m < 2 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`; };
+export const chat = (scope: ChatScope, actions: string, history: ChatMsg[], message: string) => {
+  const c = chantier()!, t = now();
+  return ask(P.chatPrompt({
+    section: SECTION[scope], base: baseContext(c, t), ctx: scopeContext(c, scope, t), actions, message,
+    history: history.slice(-24).map((m) => ({ de: m.from === "coach" ? "coach" : "lui", quand: quand(m.ts, t), texte: m.text })),
+  }), S.ChatSchema, { max: 700 });
+};
 export const genBrief = () => {
   const c = chantier()!, t = now();
   return ask(P.briefPrompt({ ensemble: templeContext(c, t), corps: corpsContext(c, t), capital: capitalContext(c, t), esprit: espritContext(c, t), verbe: verbeContext(c, t) }), S.BriefSchema, { max: 500 }, true);

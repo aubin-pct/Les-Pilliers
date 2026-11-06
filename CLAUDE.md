@@ -26,8 +26,8 @@ Mémoire du Contremaître (bilan IA par pilier) ──────────�
 
 L'application parle par la voix du Contremaître. Chaque page commence par son visage (`features/coach/Avatar.tsx` : masque de pierre, regard dans la couleur du pilier, bouche en barres de son ; états repos, réflexion, parole, écoute) et **une seule phrase** (`CoachHead`) : le brief IA du jour (`genBrief`, une génération par jour, `chantier.brief`) tant que le plancher n'est pas posé, sinon une phrase locale chiffrée (`engine/coachLines.ts`). Toucher la bulle ouvre la conversation ; un bouton flottant (`CoachFab`) prend le relais quand la tête sort de l'écran.
 
-- **Conversation** (`CoachPanel.tsx`) : une par section (`chantier.chats[scope]`, 40 messages, synchronisée). Le Coach reçoit le dossier de la section ouverte (`scopeContext`), répond en 60 mots au plus et propose jusqu'à 3 **actions** exécutables d'un geste. Dictée (`lib/voice.ts`, reconnaissance vocale) et voix (synthèse fr-FR, réglage `settings.voice`).
-- **Actions** (`ai/actions.ts`) : liste blanche décrite à l'IA et filtrée au retour (`ouvrir`, `profil`, `seance`, `programme`, `pistes`, `sprint`, `prospect`, `etudier`, `parcours`, `carte`, `exercice`). Elles appellent les mêmes opérations que les boutons (`ai/ops.ts`). `profil` ne touche qu'aux champs de `EDITABLE`, avec contrôle de type.
+- **Conversation** (`CoachPanel.tsx`) : une par section (`chantier.chats[scope]`, 40 messages, synchronisée ; bouton « Nouvelle conversation » → `chatReset[scope]`, que la fusion respecte). Le Coach reçoit toujours `baseContext` (qui il est, tous piliers), le dossier de la section ouverte (`scopeContext`) et les 24 derniers messages datés (« il y a 3 h »), répond en 60 mots au plus et propose jusqu'à 3 **actions** exécutables d'un geste. Dictée (`lib/voice.ts`, reconnaissance vocale) et voix (synthèse fr-FR, réglage `settings.voice`).
+- **Actions** (`ai/actions.ts`) : liste blanche décrite à l'IA et filtrée au retour (`ouvrir`, `profil`, `test` (performance déclarée → `recordTest`), `seance`, `programme`, `pistes`, `sprint`, `prospect`, `etudier`, `parcours`, `carte`, `exercice`). Elles appellent les mêmes opérations que les boutons (`ai/ops.ts`). `profil` ne touche qu'aux champs de `EDITABLE`, avec contrôle de type. Une action qui échoue lève une erreur dont la raison s'affiche dans la conversation (« ✗ … n'a pas marché : … »).
 - **Règle** : un écran = une action principale, des chiffres et des formes ; tout le reste dans des `<Fold>` repliés. Pas de paragraphe d'explication : si c'est utile, le Coach le dit.
 
 ## Ce que fait chaque pilier
@@ -71,7 +71,7 @@ Tout se fait dans `src/content/`, sans toucher au moteur :
 - `esprit.ts` : `TOPICS` (titre + domaine). Le sujet du jour tourne entre les domaines (`DOMAINS`) et ne repropose jamais un sujet déjà traité.
 - `verbe.ts` : `SUBJECTS`, `TICS`, `DRILLS` (exercices : compétence, durée, consigne pour l'IA, étapes), contenus de secours (`VIRELANGUES`, `LECTURES`, `MOTS`, `PIEGES`).
 - `capital.ts` : `LADDER` (échelle de 8 missions, `cash` = montant exigé) et `CONCEPTS`.
-- `corps.ts` : `TESTS` (mode de mesure : `nez`, `chrono`, `minuteur`, `saisie`) et `SEANCES` (doses `{p}` pompes, `{d}` dips, `{g}` gainage, `{s}` squats, `{e}` pompes explosives, calculées dans `todaySeance`).
+- `corps.ts` : `TESTS` (pompes, tractions, gainage, squats ; souplesse `secondary`, proposée à part ; mode de mesure : `nez`, `chrono`, `minuteur`, `saisie` ; `CORE_TESTS` pour le point zéro) et `SEANCES` (doses `{p}` pompes, `{d}` dips, `{g}` gainage, `{s}` squats, `{e}` pompes explosives, calculées dans `todaySeance`).
 - `pillars.ts` : taux d'érosion, planchers, pénalité de minuit.
 
 ## Règles du jeu (moteur)

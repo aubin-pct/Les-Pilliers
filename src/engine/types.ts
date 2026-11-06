@@ -223,6 +223,8 @@ export interface Chantier {
   memoire: Partial<Record<PillarId, Memoire>>;
   /* v5 : le Coach, le Capital v2, la carte du savoir */
   chats: Partial<Record<ChatScope, ChatMsg[]>>;
+  /** Dernière réinitialisation de chaque conversation (les messages plus anciens ne reviennent pas par la synchro). */
+  chatReset?: Partial<Record<ChatScope, number>>;
   brief: { date: string; lines: Partial<Record<ChatScope, string>> } | null;
   capital: CapitalPlan;
   knowledgeMap: KnowledgeMap | null;

@@ -19,6 +19,8 @@ const DEFS: ActionDef[] = [
     run: (p) => O.setProfileField(s(p.pilier), s(p.champ), p.valeur) },
   { type: "seance", scopes: ["corps", "temple"], doc: `seance {"demande"?: string, "minutes"?: number, "energie"?: "basse"|"normale"|"haute", "douleur"?: string, "neuf"?: boolean} : prépare la séance du jour, ou MODIFIE celle qui existe (voir seance_du_jour) : seule la demande s'applique, le reste et les demandes précédentes sont gardés. N'indique minutes, énergie ou douleur que s'il les a données. "neuf": true seulement s'il veut une séance entièrement différente`,
     run: (p, nav) => { nav("/corps"); return O.prepareSeance({ minutes: n(p.minutes), energie: s(p.energie) || undefined, douleur: s(p.douleur) || undefined, demande: s(p.demande), neuf: p.neuf === true }); } },
+  { type: "test", scopes: ["corps", "temple"], doc: `test {"test": ${"pompes|tractions|gainage|squats|souplesse".split("|").map((t) => `"${t}"`).join("|")}, "valeur": number} : enregistre une performance qu'il vient de te donner sur un test étalon (pompes, tractions en répétitions max ; gainage en secondes ; squats en 60 s ; souplesse en cm). Propose-la dès qu'il te donne un chiffre de ce type`,
+    run: (p) => O.recordTest(s(p.test), p.valeur) },
   { type: "programme", scopes: ["corps"], doc: `programme {"demande": string} : refait le programme de la semaine selon la demande`,
     run: (p) => O.remakeProgramme(s(p.demande)) },
   { type: "pistes", scopes: ["capital"], doc: `pistes {"demande"?: string} : génère 3 nouvelles pistes d'activité (tient compte de la demande)`,

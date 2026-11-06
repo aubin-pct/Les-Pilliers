@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { TESTS, type TestId } from "@/content/corps";
+import { CORE_TESTS, TESTS, type TestId } from "@/content/corps";
 import { bestOf } from "@/engine/scoring";
 import { fallbackProgramme } from "@/engine/fallbacks";
 import { genProgramme } from "@/ai/contremaitre";
 import { DAY, dayIndex, fdate, plural } from "@/lib/format";
 import { useChantier, useStore } from "@/store";
 import { toast } from "@/store/ui";
-import { Card, Fold, PillarHeader, Sparkline, Thinking, useNow } from "@/ui/kit";
+import { Fold, PillarHeader, Sparkline, Thinking, useNow } from "@/ui/kit";
 import { CoachHead } from "@/features/coach/CoachHead";
 import { TestSheet } from "./TestSheet";
 import { SessionCard } from "./SessionCard";
@@ -17,7 +17,10 @@ export function CorpsView() {
   const [test, setTest] = useState<TestId | null>(null);
   const lastTest = c.tests.length ? c.tests[c.tests.length - 1].ts : 0;
   const surprise = c.tests.length > 0 && (now - lastTest) / DAY > 9;
-  const pick = TESTS[dayIndex(now) % TESTS.length];
+  const pick = CORE_TESTS[dayIndex(now) % CORE_TESTS.length];
+  const shown = TESTS.filter((T) => !T.secondary || c.tests.some((t) => t.kind === T.id));
+  const extra = TESTS.filter((T) => !shown.includes(T));
+  const records = shown.filter((T) => bestOf(c, T.id) !== null).length;
 
   return (
     <div className="view">
@@ -33,24 +36,24 @@ export function CorpsView() {
       <SessionCard c={c} now={now} />
       <WeekStrip />
 
-      <Card title="Tests étalons" aside="record = montée">
-        <div className="tests">
-          {TESTS.map((T) => {
+      <Fold title="Tests étalons" aside={`${records}/${shown.length} records`}>
+        <div className="tlist">
+          {shown.map((T) => {
             const all = c.tests.filter((t) => t.kind === T.id);
             const l = all[all.length - 1], b = bestOf(c, T.id);
             const sg = (v: number) => (T.id === "souplesse" && v > 0 ? "+" : "") + v;
             return (
-              <div className="test" key={T.id}>
-                <span className="tn">{T.name}</span>
-                <span className="tv num">{l ? `${sg(l.value)} ${T.unit}` : "—"}</span>
-                <span className="tb num">{b !== null ? `record ${sg(b)} · ${fdate(l.ts)}` : "jamais passé"}</span>
-                <Sparkline values={all.map((t) => t.value)} color="var(--c-corps)" />
+              <div className="trow" key={T.id}>
+                <span className="tr-n">{T.name}<i>{l ? `${fdate(l.ts)}${b !== null && b !== l.value ? ` · record ${sg(b)}` : ""}` : "jamais passé"}</i></span>
+                {all.length > 1 && <Sparkline values={all.map((t) => t.value)} color="var(--c-corps)" />}
+                <b className="tr-v num">{l ? `${sg(l.value)}` : "—"}<small>{l ? T.unit : ""}</small></b>
                 <button className="btn small" type="button" onClick={() => setTest(T.id)}>Tester</button>
               </div>
             );
           })}
         </div>
-      </Card>
+        {extra.length > 0 && <div className="chips">{extra.map((T) => <button key={T.id} type="button" className="chip" onClick={() => setTest(T.id)}>+ {T.name}</button>)}</div>}
+      </Fold>
 
       <ProgrammeFold />
       <Fold title="Journal" aside={`${c.seances.length} ${plural(c.seances.length, "séance")}`}>

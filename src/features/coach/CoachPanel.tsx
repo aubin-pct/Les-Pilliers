@@ -73,6 +73,11 @@ function Panel({ scope, prefill, onClose }: { scope: ChatScope; prefill: string;
   }, []);
   useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight, behavior: "smooth" }); }, [msgs.length, thinking]);
 
+  const [confirmReset, setConfirmReset] = useState(false);
+  const reset = () => {
+    act((d) => { d.chats[scope] = []; (d.chatReset ??= {})[scope] = Date.now(); });
+    setConfirmReset(false); hush(); toast("Conversation effacée. Il garde ton profil et tes données.");
+  };
   const push = (m: ChatMsg) => act((d) => { const a = (d.chats[scope] ??= []); a.push(m); if (a.length > 40) d.chats[scope] = a.slice(-40); });
 
   const send = async (raw?: string) => {
@@ -95,10 +100,12 @@ function Panel({ scope, prefill, onClose }: { scope: ChatScope; prefill: string;
   const run = async (a: CoachAction, key: string) => {
     setUsed((s) => new Set(s).add(key));
     useCoach.setState({ thinking: true });
-    const res = await runAction(a, (to) => nav(to));
+    let res: string | null = null, err = "";
+    try { res = await runAction(a, (to) => nav(to)); } catch (e) { err = (e as Error).message || "erreur inconnue"; }
     useCoach.setState({ thinking: false });
-    if (res) { const ts = Date.now(); push({ ts, from: "coach", text: "✓ " + res }); setFresh(ts); if (settings.voice) void speak(res); }
-    else if (a.type !== "ouvrir") toast("Action impossible pour l'instant.");
+    const ts = Date.now();
+    if (res) { push({ ts, from: "coach", text: "✓ " + res }); setFresh(ts); if (settings.voice) void speak(res); }
+    else if (a.type !== "ouvrir") { push({ ts, from: "coach", text: `✗ « ${a.label} » n'a pas marché : ${err || "l'IA n'a pas répondu, réessaie."}` }); setFresh(ts); setUsed((s) => { const n = new Set(s); n.delete(key); return n; }); }
     if (a.type === "ouvrir") onClose();
   };
 
@@ -116,6 +123,11 @@ function Panel({ scope, prefill, onClose }: { scope: ChatScope; prefill: string;
       <header className="cp-head">
         <Avatar state={state} size={46} />
         <div className="cp-who"><b>Le Contremaître</b><span>{NAME[scope]} · voit tes données</span></div>
+        {msgs.length > 0 && (confirmReset
+          ? <button type="button" className="btn small danger" onClick={reset} onBlur={() => setConfirmReset(false)} autoFocus>Effacer ?</button>
+          : <button type="button" className="cp-icon" aria-label="Nouvelle conversation" onClick={() => setConfirmReset(true)}>
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+            </button>)}
         {canSpeak && <button type="button" className={"cp-icon" + (settings.voice ? " on" : "")} aria-pressed={settings.voice} aria-label="Voix" onClick={() => { if (settings.voice) hush(); setSettings({ voice: !settings.voice }); }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z" />{settings.voice ? <path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /> : <path d="M17 9l5 6M22 9l-5 6" />}</svg>
         </button>}

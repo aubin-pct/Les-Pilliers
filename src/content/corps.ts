@@ -1,4 +1,4 @@
-export type TestId = "pompes" | "gainage" | "squats" | "souplesse";
+export type TestId = "pompes" | "tractions" | "gainage" | "squats" | "souplesse";
 
 export interface TestDef {
   id: TestId;
@@ -8,14 +8,19 @@ export interface TestDef {
   mode: "nez" | "chrono" | "minuteur" | "saisie";
   timer?: number;
   hint?: string;
+  /** Test facultatif : affiché seulement s'il a déjà été passé (ou dans « Autres tests »). */
+  secondary?: boolean;
 }
 
 export const TESTS: TestDef[] = [
   { id: "pompes", name: "Pompes max", unit: "reps", mode: "nez" },
+  { id: "tractions", name: "Tractions max", unit: "reps", mode: "saisie", hint: "Une série, sans lâcher la barre : bras tendus en bas, menton au-dessus de la barre en haut, sans élan" },
   { id: "gainage", name: "Gainage planche", unit: "s", mode: "chrono" },
   { id: "squats", name: "Squats en 60 s", unit: "reps", mode: "minuteur", timer: 60 },
-  { id: "souplesse", name: "Doigts-sol", unit: "cm", mode: "saisie", hint: "+ = au-delà des orteils, − = au-dessus" },
+  { id: "souplesse", name: "Souplesse (toucher ses pieds)", unit: "cm", mode: "saisie", secondary: true, hint: "Debout ou assis jambes tendues, penche-toi : distance entre le bout des doigts et les orteils. + si tu les dépasses, − s'il te manque des centimètres" },
 ];
+/** Tests principaux (le point zéro du Temple demande ceux-là). */
+export const CORE_TESTS = TESTS.filter((t) => !t.secondary);
 
 /**
  * Séances en rotation. Les doses entre accolades s'adaptent aux records :

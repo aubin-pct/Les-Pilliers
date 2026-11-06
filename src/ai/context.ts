@@ -139,6 +139,21 @@ export function templeContext(c: Chantier, now: number) {
   };
 }
 
+/** Ce que le Coach sait toujours de lui, quelle que soit la section. */
+export function baseContext(c: Chantier, now: number) {
+  const p = c.profile;
+  return {
+    prenom: p?.prenom || undefined,
+    jours_depuis_le_debut: Math.max(0, Math.floor((now - c.created) / DAY)),
+    corps: p && { objectifs: p.corps.objectifs.map((g) => GOALS.find((x) => x.id === g)?.label ?? g), niveau: lvl(p.corps.niveau), age: p.corps.age, poids_kg: p.corps.poids, taille_cm: p.corps.taille, contraintes: p.corps.contraintes || undefined },
+    capital: p && { situation: p.capital.situation, objectif: p.capital.objectif, piste: c.capital.thesis?.option.nom },
+    esprit: p && { domaines: p.esprit.domaines },
+    verbe: p && { contexte: p.verbe.contexte || undefined, objectif: p.verbe.objectif || undefined },
+    priorites_du_contremaitre: Object.fromEntries((["corps", "capital", "esprit", "verbe"] as PillarId[]).map((id) => [id, c.memoire[id]?.priorite]).filter(([, v]) => v)),
+    hauteurs: Object.fromEntries((["corps", "capital", "esprit", "verbe"] as PillarId[]).map((id) => [id, +c.p[id].s.toFixed(1)])),
+  };
+}
+
 export function scopeContext(c: Chantier, scope: ChatScope, now: number) {
   return scope === "temple" ? templeContext(c, now) : pillarContext(c, scope, now);
 }

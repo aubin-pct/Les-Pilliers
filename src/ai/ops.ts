@@ -4,7 +4,8 @@
  */
 import { DRILL, type DrillId } from "@/content/verbe";
 import { gain } from "@/engine/core";
-import { POINTS } from "@/engine/scoring";
+import { applyTest, POINTS } from "@/engine/scoring";
+import { TESTS } from "@/content/corps";
 import type { BizOption, Chantier, PillarId, Profile } from "@/engine/types";
 import { dayKey, weekKey } from "@/lib/format";
 import { useStore } from "@/store";
@@ -45,6 +46,18 @@ export async function remakeProgramme(demande = "") {
   if (!r) return null;
   act((d) => { d.plans.programme = { ts: Date.now(), ...r }; if (d.seanceStart === null) d.plans.seance = null; });
   return `Programme refait : ${r.titre}.`;
+}
+
+/** Enregistre une performance déclarée (dans la conversation) sur un test étalon. */
+export function recordTest(kind: string, valeur: unknown) {
+  const T = TESTS.find((t) => t.id === kind);
+  if (!T) throw new Error(`Test inconnu : ${kind}. Tests : ${TESTS.map((t) => t.id).join(", ")}.`);
+  const v = Math.round(Number(String(valeur).replace(",", ".")));
+  const ok = T.id === "souplesse" ? v >= -60 && v <= 60 : v >= 0 && v <= 1000;
+  if (!Number.isFinite(v) || !ok) throw new Error(`Valeur impossible pour ${T.name.toLowerCase()} : ${String(valeur)}.`);
+  const r = useStore.getState().act((d) => applyTest(d, T.id, v, Date.now(), false));
+  gainToast("corps", r.g, r.msg);
+  return `${T.name} : ${v} ${T.unit} enregistré. ${r.msg}`;
 }
 
 /* ---------------- Capital ---------------- */
@@ -151,14 +164,15 @@ export const EDITABLE: Fields = {
 /** Met à jour un champ du profil (liste blanche, types respectés). */
 export function setProfileField(pilier: string, champ: string, valeur: unknown) {
   const c = get();
-  if (!c.profile || !(pilier in EDITABLE)) return null;
+  if (!c.profile) throw new Error("Profil pas encore rempli.");
+  if (!(pilier in EDITABLE)) throw new Error(`Pilier inconnu : ${pilier}.`);
   const id = pilier as PillarId;
-  if (!(EDITABLE[id] as string[]).includes(champ)) return null;
+  if (!(EDITABLE[id] as string[]).includes(champ)) throw new Error(`Le champ « ${champ} » n'existe pas dans le profil ${pilier}.`);
   const cur = (c.profile[id] as unknown as Record<string, unknown>)[champ];
   let v: unknown;
-  if (typeof cur === "number" || cur === null) { const n = Number(valeur); if (!Number.isFinite(n)) return null; v = Math.round(n); }
+  if (typeof cur === "number" || cur === null) { const n = Number(valeur); if (!Number.isFinite(n)) throw new Error(`« ${String(valeur)} » n'est pas un nombre.`); v = Math.round(n); }
   else if (Array.isArray(cur)) v = (Array.isArray(valeur) ? valeur : String(valeur).split(/[,;]/)).map((x) => String(x).trim()).filter(Boolean).slice(0, 14);
-  else if (champ === "niveau") { if (!["debutant", "intermediaire", "avance"].includes(String(valeur))) return null; v = String(valeur); }
+  else if (champ === "niveau") { if (!["debutant", "intermediaire", "avance"].includes(String(valeur))) throw new Error("Niveau : debutant, intermediaire ou avance."); v = String(valeur); }
   else v = String(valeur ?? "").slice(0, 400);
   act((d) => { if (d.profile) { (d.profile[id] as unknown as Record<string, unknown>)[champ] = v; d.profile.updated = Date.now(); } });
   return "Profil mis à jour.";
