@@ -87,8 +87,11 @@ function TodayCard({ now }: { now: number }) {
   const c = useChantier()!;
   const act = useStore((s) => s.act);
   const today = dayKey(now);
-  const entry = c.esprit.find((e) => dayKey(e.ts) === today);
-  const choice = c.espritChoice?.date === today ? c.espritChoice : null;
+  const todays = c.esprit.filter((e) => dayKey(e.ts) === today);
+  const entry = todays[todays.length - 1];
+  // Pas de limite : un sujet choisi et pas encore rendu reste ouvert, même après un premier sujet dans la journée.
+  const choice = c.espritChoice?.date === today && !todays.some((e) => e.topic === c.espritChoice!.titre && e.ts >= (entry?.ts ?? 0)) ? c.espritChoice : null;
+  const [more, setMore] = useState(false);
   const props = c.plans.espritProps?.date === today ? c.plans.espritProps.items : null;
   const parcours = c.parcours.find((p) => p.id === c.parcoursActif);
   const next = parcours?.sujets[parcours.index];
@@ -106,9 +109,9 @@ function TodayCard({ now }: { now: number }) {
     if (r) act((d) => { d.plans.espritProps = { date: dayKey(Date.now()), items: r.sujets }; });
   };
   useEffect(() => {
-    if (props || choice || entry || !aiReady() || tried.current === today) return;
+    if (props || choice || (entry && !more) || !aiReady() || tried.current === today) return;
     tried.current = today; void loadProps();
-  }, [today, props, choice, entry]);
+  }, [today, props, choice, entry, more]);
 
   const choose = (ch: Omit<EspritChoice, "date" | "fiche">) => act((d) => { d.espritChoice = { ...ch, date: dayKey(Date.now()), fiche: null }; });
   const loadFiche = async () => {
@@ -138,20 +141,21 @@ function TodayCard({ now }: { now: number }) {
       return gain(d, "esprit", note, ts);
     });
     gainToast("esprit", g);
-    setBusy(""); clearAns();
+    setBusy(""); clearAns(); setMore(false);
     setExam({ note, ai: !!r, lines: r ? [["Verdict", r.verdict], ["Lacune", r.lacune], ["Objection à réfuter", r.objection], ["À lire", r.a_lire]] : [] });
   };
 
   if (exam) return <Card title="Sujet du jour"><ExamResult exam={exam} onContinue={() => setExam(null)} /></Card>;
 
-  if (entry) {
+  if (entry && !choice && !more) {
     return (
-      <Card title="Sujet du jour" aside={<span className="tag ok">fait</span>}>
+      <Card title={todays.length > 1 ? `${todays.length} sujets aujourd'hui` : "Sujet du jour"} aside={<span className="tag ok">fait</span>}>
         <div className="done-row">
           <span className={"big-note num " + (entry.note >= 6 ? "up" : "down")}>{entry.note}<i>/10</i></span>
           <div><b>{entry.topic}</b><span className="muted small">révision le {fdate(entry.next)}</span></div>
         </div>
         {entry.lacune && <p className="voice small">Lacune : {entry.lacune}</p>}
+        <button className="btn" type="button" onClick={() => setMore(true)}>+ Encore un sujet</button>
       </Card>
     );
   }
@@ -186,7 +190,7 @@ function TodayCard({ now }: { now: number }) {
     );
   }
 
-  const items = props ?? (aiReady() ? null : fallbackProposals(c, now));
+  const items = (props ?? (aiReady() ? null : fallbackProposals(c, now)))?.filter((t) => !todays.some((e) => e.topic === t.titre));
   return (
     <Card title="Sujet du jour" aside="choisis">
       <div className="picks">

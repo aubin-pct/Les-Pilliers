@@ -131,8 +131,6 @@ export async function makeMap() {
   return `Carte du savoir : ${r.domaines.reduce((a, x) => a + x.sujets.length, 0)} sujets.`;
 }
 export function studyTopic(titre: string, domaine: string) {
-  const c = get();
-  if (c.esprit.some((e) => dayKey(e.ts) === dayKey(Date.now()))) return "Sujet du jour déjà fait. Celui-ci t'attend demain.";
   act((d) => { d.espritChoice = { date: dayKey(Date.now()), titre: titre.slice(0, 100), domaine: domaine.slice(0, 40) || "libre", source: "libre", fiche: null }; });
   return `Sujet du jour : ${titre}.`;
 }

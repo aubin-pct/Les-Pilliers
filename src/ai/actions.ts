@@ -5,6 +5,7 @@
 import { DRILLS, type DrillId } from "@/content/verbe";
 import type { ChatScope, CoachAction } from "@/engine/types";
 import * as O from "./ops";
+import { addExo } from "@/features/corps/session";
 
 interface ActionDef { type: string; scopes: ChatScope[] | "all"; doc: string; run: (p: Record<string, unknown>, nav: (to: string) => void) => Promise<string | null> | string | null }
 
@@ -21,6 +22,8 @@ const DEFS: ActionDef[] = [
     run: (p, nav) => { nav("/corps"); return O.prepareSeance({ minutes: n(p.minutes), energie: s(p.energie) || undefined, douleur: s(p.douleur) || undefined, demande: s(p.demande), neuf: p.neuf === true }); } },
   { type: "test", scopes: ["corps", "temple"], doc: `test {"test": ${"pompes|tractions|gainage|squats|souplesse".split("|").map((t) => `"${t}"`).join("|")}, "valeur": number} : enregistre une performance qu'il vient de te donner sur un test étalon (pompes, tractions en répétitions max ; gainage en secondes ; squats en 60 s ; souplesse en cm). Propose-la dès qu'il te donne un chiffre de ce type`,
     run: (p) => O.recordTest(s(p.test), p.valeur) },
+  { type: "ajouter_exercice", scopes: ["corps"], doc: `ajouter_exercice {"nom": string, "type": "reps"|"duree", "series": number, "cible": number, "charge"?: string, "repos"?: number} : ajoute un exercice à la séance du jour, même commencée (sans toucher au reste). Pas de limite au nombre d'exercices`,
+    run: (p) => addExo({ nom: s(p.nom), type: s(p.type) === "duree" ? "duree" : "reps", series: n(p.series), cible: n(p.cible), charge: s(p.charge), repos: n(p.repos) }) },
   { type: "programme", scopes: ["corps"], doc: `programme {"demande": string} : refait le programme de la semaine selon la demande`,
     run: (p) => O.remakeProgramme(s(p.demande)) },
   { type: "pistes", scopes: ["capital"], doc: `pistes {"demande"?: string} : génère 3 nouvelles pistes d'activité (tient compte de la demande)`,

@@ -18,7 +18,7 @@ const list = <T extends z.ZodTypeAny>(item: T, min: number, max: number) => z.ar
 export const ExoSchema = z.object({
   nom: txt(80),
   type: z.enum(["reps", "duree"]).catch("reps"),
-  series: int(1, 10, 3),
+  series: int(1, 30, 3),
   cible: int(1, 600, 10),
   charge: opt(60),
   repos: int(0, 600, 60),
@@ -26,8 +26,8 @@ export const ExoSchema = z.object({
   alternative: opt(120),
 });
 export const SeanceSchema = z.object({
-  titre: txt(60), focus: txt(120), duree: int(5, 180, 40), pourquoi: txt(400),
-  echauffement: txt(300), exos: list(ExoSchema, 2, 12), retourAuCalme: opt(300), ajustement: opt(300),
+  titre: txt(60), focus: txt(120), duree: int(5, 600, 40), pourquoi: txt(400),
+  echauffement: txt(300), exos: list(ExoSchema, 1, 40), retourAuCalme: opt(300), ajustement: opt(300),
 });
 export const ProgrammeSchema = z.object({
   titre: txt(60), logique: txt(500),

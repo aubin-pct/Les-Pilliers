@@ -10,7 +10,7 @@ import { fallbackSeance } from "@/engine/fallbacks";
 import { POINTS, setsRatio } from "@/engine/scoring";
 import { HoldButton } from "@/ui/HoldButton";
 import { FocusSession } from "./FocusSession";
-import { addSet, faitsOf, fillExo, finishSession, parseKg, poidsOf, removeSet, setPoids, setSet } from "./session";
+import { addExo, addSet, faitsOf, fillExo, finishSession, parseKg, poidsOf, removeExo, removeSet, setPoids, setSet } from "./session";
 import type { Chantier, SeancePlan } from "@/engine/types";
 import { beep, buzz, keepAwake } from "@/lib/device";
 import { dayKey, fmtDur } from "@/lib/format";
@@ -25,24 +25,31 @@ export function SessionCard({ c, now }: { c: Chantier; now: number }) {
   const act = useStore((s) => s.act);
   const today = dayKey(now);
   const done = c.seances.filter((s) => dayKey(s.ts) === today);
-  const plan = c.plans.seance?.date === today ? c.plans.seance : null;
-  const running = c.seanceStart !== null && !!plan;
+  const raw = c.plans.seance?.date === today ? c.plans.seance : null;
+  const running = c.seanceStart !== null && !!raw;
+  // Ancienne version : la séance terminée restait en place. Elle compte comme faite.
+  const plan = raw && !running && done.some((s) => s.type === raw.titre && s.timed && (raw.faits?.some((f) => f.some((x) => x !== null)) ?? false)) ? null : raw;
   const [adjusting, setAdjusting] = useState(false);
+  const [another, setAnother] = useState(false);
 
-  if (done.length && !running) {
-    const s = done[done.length - 1];
+  if (done.length && !running && !plan && !another) {
     return (
-      <Card title="Séance du jour" aside={<span className="tag ok">posé</span>}>
-        <p className="h-display" style={{ fontSize: 24 }}>{s.type}</p>
-        <div className="kpis">
-          <div><b className="num">{s.timed ? s.dur : "—"}</b><span>min</span></div>
-          <div><b className="num">{s.done}/{s.total}</b><span>séries</span></div>
-          <div><b className="num">{s.rpe ?? "—"}</b><span>effort</span></div>
-        </div>
+      <Card title={done.length > 1 ? `${done.length} séances aujourd'hui` : "Séance du jour"} aside={<span className="tag ok">posé</span>}>
+        {done.map((s) => (
+          <div key={s.ts} className="done-seance">
+            <p className="h-display" style={{ fontSize: 22 }}>{s.type}</p>
+            <div className="kpis">
+              <div><b className="num">{s.timed ? s.dur : "—"}</b><span>min</span></div>
+              <div><b className="num">{s.done}/{s.total}</b><span>séries</span></div>
+              <div><b className="num">{s.rpe ?? "—"}</b><span>effort</span></div>
+            </div>
+          </div>
+        ))}
+        <button className="btn" type="button" onClick={() => setAnother(true)}>+ Nouvelle séance</button>
       </Card>
     );
   }
-  if (!plan || adjusting) return <Prepare c={c} now={now} onDone={() => setAdjusting(false)} canCancel={!!plan} />;
+  if (!plan || adjusting) return <Prepare c={c} now={now} onDone={() => { setAdjusting(false); setAnother(false); }} canCancel={!!plan || another} fresh={!plan} />;
   if (!running) {
     return (
       <Card title="Séance du jour" aside={<span className="tag">prête</span>}>
@@ -62,11 +69,11 @@ export function SessionCard({ c, now }: { c: Chantier; now: number }) {
   return <Run c={c} plan={plan} now={now} />;
 }
 
-function Prepare({ c, now, onDone, canCancel }: { c: Chantier; now: number; onDone: () => void; canCancel: boolean }) {
+function Prepare({ c, now, onDone, canCancel, fresh }: { c: Chantier; now: number; onDone: () => void; canCancel: boolean; fresh?: boolean }) {
   const act = useStore((s) => s.act);
   const prof = c.profile?.corps;
   // Modifier une séance existante : on repart de ses conditions, et seule la nouvelle demande s'ajoute.
-  const cur = c.plans.seance?.date === dayKey(now) ? c.plans.seance : null;
+  const cur = !fresh && c.plans.seance?.date === dayKey(now) ? c.plans.seance : null;
   const prev = cur?.conditions;
   const [minutes, setMinutes] = useState(prev?.minutes ?? prof?.minutes ?? 40);
   const [energie, setEnergie] = useState(prev?.energie ?? "normale");
@@ -79,7 +86,7 @@ function Prepare({ c, now, onDone, canCancel }: { c: Chantier; now: number; onDo
 
   const go = async (neuf = false) => {
     setBusy(true);
-    const r = await prepareSeance({ minutes, energie, materiel, douleur: douleur.trim(), demande: demande.trim(), neuf });
+    const r = await prepareSeance({ minutes, energie, materiel, douleur: douleur.trim(), demande: demande.trim(), neuf: neuf || !cur });
     setBusy(false);
     if (r) { if (cur && !neuf) toast(r); onDone(); }
   };
@@ -181,10 +188,12 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
               {!(withKg.has(i) || poids[i].some((p) => p !== null) || parseKg(e.charge) !== null) && <button className="btn small ghost" type="button" onClick={() => setWithKg((s) => new Set(s).add(i))}>+ kg</button>}
             </div>
             {e.alternative && <span className="muted" style={{ fontSize: 12 }}>Trop dur : {e.alternative}</span>}
+            {plan.exos.length > 1 && !faits[i].some((x) => x !== null) && <button className="linkish small" type="button" onClick={() => removeExo(i)}>Retirer cet exercice</button>}
           </div>
         ))}
       </div>
       </Fold>
+      <AddExo />
       <span className="muted small">Effort ressenti, 1 à 10</span>
       <div className="rpe">{Array.from({ length: 10 }, (_, k) => k + 1).map((n) => <button key={n} type="button" aria-pressed={rpe === n} onClick={() => { setRpe(n); buzz(10); }}>{n}</button>)}</div>
       <input id="se-note" aria-label="Sensations" type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Sensations, douleurs (facultatif)" />
@@ -196,5 +205,32 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
       {rest && <div className="rest" role="status">Repos · {rest.nom} <b className="num">{Math.max(0, left)}</b><button className="btn small ghost" type="button" onClick={() => setRest(null)}>Passer</button></div>}
       {focus && <FocusSession plan={plan} start={c.seanceStart ?? now} onClose={() => setFocus(false)} />}
     </Card>
+  );
+}
+
+/** Ajouter un exercice à la séance en cours. */
+function AddExo() {
+  const [open, setOpen] = useState(false);
+  const [nom, setNom] = useState("");
+  const [type, setType] = useState<"reps" | "duree">("reps");
+  const [series, setSeries] = useState("3");
+  const [cible, setCible] = useState("10");
+  const [charge, setCharge] = useState("");
+  if (!open) return <button className="btn ghost" type="button" onClick={() => setOpen(true)}>+ Ajouter un exercice</button>;
+  const add = () => {
+    try { toast(addExo({ nom, type, series: Number(series), cible: Number(cible), charge: charge.trim() ? `${charge.trim().replace(/\s*kg$/i, "")} kg` : "" })); setOpen(false); setNom(""); setCharge(""); }
+    catch (e) { toast((e as Error).message); }
+  };
+  return (
+    <div className="add-exo">
+      <input type="text" aria-label="Nom de l'exercice" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Exercice (ex. : curl biceps)" />
+      <Segmented label="Mesure" value={type} options={[{ id: "reps", label: "Répétitions" }, { id: "duree", label: "Secondes" }]} onChange={(v) => { setType(v); setCible(v === "duree" ? "30" : "10"); }} />
+      <div className="add-exo-row">
+        <label className="f">Séries<input type="number" inputMode="numeric" value={series} onChange={(e) => setSeries(e.target.value)} /></label>
+        <label className="f">{type === "duree" ? "Secondes" : "Reps"}<input type="number" inputMode="numeric" value={cible} onChange={(e) => setCible(e.target.value)} /></label>
+        <label className="f">kg<input type="number" inputMode="decimal" value={charge} onChange={(e) => setCharge(e.target.value)} placeholder="—" /></label>
+      </div>
+      <div className="btn-row"><button className="btn primary" type="button" onClick={add}>Ajouter</button><button className="btn ghost" type="button" onClick={() => setOpen(false)}>Annuler</button></div>
+    </div>
   );
 }

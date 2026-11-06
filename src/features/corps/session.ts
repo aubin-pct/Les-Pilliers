@@ -36,11 +36,39 @@ export function addSet(i: number) {
   useStore.getState().act((d) => {
     const s = d.plans.seance; if (!s || !s.exos[i]) return;
     s.faits = s.faits ?? emptyFaits(s);
-    if (s.faits[i].length >= 12) return;
+    if (s.faits[i].length >= 40) return;
     alignPoids(s);
     s.faits[i].push(null);
     s.poids![i].push(s.poids![i][s.poids![i].length - 1] ?? null);
     s.exos[i].series = s.faits[i].length;
+  });
+}
+/** Ajoute un exercice à la séance (prévue ou en cours). */
+export function addExo(e: { nom: string; type?: "reps" | "duree"; series?: number; cible?: number; charge?: string; repos?: number; consigne?: string }) {
+  const nom = e.nom.trim();
+  if (nom.length < 2) throw new Error("Donne un nom à l'exercice.");
+  const type = e.type === "duree" ? "duree" : "reps";
+  const series = Math.max(1, Math.min(40, Math.round(e.series ?? 3)));
+  const cible = Math.max(1, Math.min(3600, Math.round(e.cible ?? (type === "duree" ? 30 : 10))));
+  const ok = useStore.getState().act((d) => {
+    const s = d.plans.seance; if (!s) return false;
+    s.exos.push({ nom: nom.slice(0, 80), type, series, cible, charge: (e.charge ?? "").slice(0, 60), repos: Math.max(0, Math.min(600, Math.round(e.repos ?? 60))), consigne: (e.consigne ?? "").slice(0, 240), alternative: "" });
+    if (d.seanceStart !== null) {
+      s.faits = s.faits ?? emptyFaits(s);
+      if (s.faits.length < s.exos.length) s.faits.push(Array(series).fill(null));
+      alignPoids(s);
+    }
+    return true;
+  });
+  if (!ok) throw new Error("Aucune séance aujourd'hui : prépare-la d'abord.");
+  return `${nom} ajouté : ${series} × ${cible}${type === "duree" ? " s" : ""}.`;
+}
+/** Retire un exercice dont aucune série n'est faite. */
+export function removeExo(i: number) {
+  useStore.getState().act((d) => {
+    const s = d.plans.seance; if (!s || s.exos.length <= 1) return;
+    if (s.faits?.[i]?.some((x) => x !== null)) return;
+    s.exos.splice(i, 1); s.faits?.splice(i, 1); s.poids?.splice(i, 1);
   });
 }
 /** Retire une série : la dernière encore vide, sinon la dernière faite. Jamais en dessous d'une. */
@@ -79,6 +107,7 @@ export function finishSession(rpe: number | null, note: string): string | null {
   const r = st.act((d) => {
     d.seances.push({ ts: Date.now(), type: plan.titre, dur, done, total, proof: `${done}/${total} séries`, timed: true, rpe, note: note.trim() || undefined, logs });
     d.seanceStart = null;
+    d.plans.seance = null; // séance terminée : la suivante se prépare à neuf
     return gain(d, "corps", seanceGain(dur, done, total), Date.now());
   });
   gainToast("corps", r);
