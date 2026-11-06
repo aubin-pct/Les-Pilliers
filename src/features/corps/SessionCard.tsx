@@ -10,7 +10,7 @@ import { fallbackSeance } from "@/engine/fallbacks";
 import { POINTS, setsRatio } from "@/engine/scoring";
 import { HoldButton } from "@/ui/HoldButton";
 import { FocusSession } from "./FocusSession";
-import { faitsOf, fillExo, finishSession, setSet } from "./session";
+import { addSet, faitsOf, fillExo, finishSession, removeSet, setSet } from "./session";
 import type { Chantier, SeancePlan } from "@/engine/types";
 import { beep, buzz, keepAwake } from "@/lib/device";
 import { dayKey, fmtDur } from "@/lib/format";
@@ -161,13 +161,15 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
       <div>
         {plan.exos.map((e, i) => (
           <div className="exo" key={i}>
-            <div className="exo-head"><b>{e.nom}</b><span className="meta">{e.series} × {e.cible}{e.type === "duree" ? " s" : ""}{e.charge ? ` · ${e.charge}` : ""}</span></div>
+            <div className="exo-head"><b>{e.nom}</b><span className="meta">{faits[i].length} × {e.cible}{e.type === "duree" ? " s" : ""}{e.charge ? ` · ${e.charge}` : ""}</span></div>
             {e.consigne && <span className="muted small">{e.consigne}</span>}
             <div className="sets">
+              <button className="btn small ghost" type="button" aria-label={`${e.nom} : retirer une série`} disabled={faits[i].length <= 1} onClick={() => removeSet(i)}>−</button>
               {faits[i].map((v, k) => (
                 <input key={k} type="number" inputMode="numeric" aria-label={`${e.nom}, série ${k + 1}`} placeholder={String(e.cible)} value={v ?? ""}
                   className={v === null ? "" : v >= e.cible ? "ok" : "ko"} onChange={(x) => setSet(i, k, x.target.value === "" ? null : Number(x.target.value.replace(",", ".")))} onBlur={() => committed(i, k)} />
               ))}
+              <button className="btn small ghost" type="button" aria-label={`${e.nom} : ajouter une série`} disabled={faits[i].length >= 12} onClick={() => addSet(i)}>+</button>
               <button className="btn small ghost" type="button" onClick={() => fillExo(i)}>Tout réussi</button>
             </div>
             {e.alternative && <span className="muted" style={{ fontSize: 12 }}>Trop dur : {e.alternative}</span>}

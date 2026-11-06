@@ -11,7 +11,7 @@ import { fmtDur } from "@/lib/format";
 import { openLayer } from "@/lib/layers";
 import { toast } from "@/store/ui";
 import { HoldButton } from "@/ui/HoldButton";
-import { faitsOf, finishSession, setSet } from "./session";
+import { addSet, faitsOf, finishSession, removeSet, setSet } from "./session";
 
 type Mode = { k: "set" } | { k: "rest"; end: number; total: number } | { k: "timer"; end: number; total: number } | { k: "end" };
 
@@ -27,8 +27,11 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
   const closeRef = useRef(onClose); closeRef.current = onClose;
 
   const E = plan.exos[ex];
+  // Série corrigée à la main (on a touché une série déjà faite) : la saisie la remplace, sans repos.
+  const [editK, setEditK] = useState<number | null>(null);
+  useEffect(() => setEditK(null), [ex]);
   const setIdx = Math.max(0, faits[ex].findIndex((x) => x === null));
-  const exoDone = faits[ex].every((x) => x !== null);
+  const exoDone = faits[ex].every((x) => x !== null) && editK === null;
   const lastDone = [...faits[ex]].reverse().find((x) => x !== null);
   const [val, setVal] = useState<number>(lastDone ?? E.cible);
   useEffect(() => { setVal(([...faitsOf(plan)[ex]].reverse().find((x) => x !== null) ?? plan.exos[ex].cible) as number); }, [ex]);
@@ -58,7 +61,13 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
   }, [now, mode]);
 
   function record(v: number) {
-    const lastSetOfExo = setIdx >= E.series - 1;
+    if (editK !== null) {
+      const after = faits[ex].map((x, k) => (k === editK ? v : x));
+      setSet(ex, editK, v); setEditK(null); buzz([25, 40, 25]);
+      setVal([...after].reverse().find((x) => x !== null) ?? E.cible); // on revient à la dernière série faite
+      return;
+    }
+    const lastSetOfExo = setIdx >= faits[ex].length - 1;
     const allDone = doneSets + 1 >= totalSets;
     // Le mode change avant l'écriture de la série, pour qu'aucun rendu intermédiaire ne la compte deux fois.
     if (allDone) setMode({ k: "end" });
@@ -121,7 +130,7 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
         <div className="focus-body center">
           <span className="eyebrow">Repos</span>
           <div className="ring-wrap">{ring((mode.end - now) / 1000, mode.total)}<span className="ring-n num">{Math.max(0, Math.ceil((mode.end - now) / 1000))}</span></div>
-          <p className="muted">Ensuite : <b className="fg">{exoDone ? plan.exos[(ex + 1) % plan.exos.length].nom : `${E.nom} · série ${setIdx + 1}/${E.series}`}</b></p>
+          <p className="muted">Ensuite : <b className="fg">{exoDone ? plan.exos[(ex + 1) % plan.exos.length].nom : `${E.nom} · série ${setIdx + 1}/${faits[ex].length}`}</b></p>
           <div className="btn-row center">
             <button className="btn" type="button" onClick={() => setMode({ ...mode, end: mode.end + 15000, total: mode.total + 15 })}>+15 s</button>
             <button className="btn primary" type="button" onClick={() => { setMode({ k: "set" }); if (exoDone) next(); }}>Passer</button>
@@ -129,22 +138,27 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
         </div>
       ) : mode.k === "timer" ? (
         <div className="focus-body center">
-          <span className="eyebrow">{E.nom} · série {setIdx + 1}/{E.series}</span>
+          <span className="eyebrow">{E.nom} · série {setIdx + 1}/{faits[ex].length}</span>
           <div className="ring-wrap">{ring((mode.end - now) / 1000, mode.total)}<span className="ring-n num">{Math.max(0, Math.ceil((mode.end - now) / 1000))}</span></div>
           <p className="muted">Tiens. Ne lâche pas avant zéro.</p>
           <button className="btn danger" type="button" onClick={() => record(Math.max(0, Math.round(mode.total - (mode.end - now) / 1000)))}>J'ai lâché</button>
         </div>
       ) : (
         <div className="focus-body">
-          <span className="eyebrow">Exercice {ex + 1}/{plan.exos.length} · {exoDone ? "terminé" : `série ${setIdx + 1}/${E.series}`}</span>
+          <span className="eyebrow">Exercice {ex + 1}/{plan.exos.length} · {editK !== null ? `correction de la série ${editK + 1}` : exoDone ? "terminé" : `série ${setIdx + 1}/${faits[ex].length}`}</span>
           <h2 className="focus-name">{E.nom}</h2>
-          <p className="focus-meta">{E.series} × {E.cible}{E.type === "duree" ? " s" : ""}{E.charge ? ` · ${E.charge}` : ""}{E.repos ? ` · repos ${E.repos} s` : ""}</p>
+          <p className="focus-meta">{faits[ex].length} × {E.cible}{E.type === "duree" ? " s" : ""}{E.charge ? ` · ${E.charge}` : ""}{E.repos ? ` · repos ${E.repos} s` : ""}</p>
           {E.consigne && <p className="muted">{E.consigne}</p>}
           <div className="focus-sets">
+            <button type="button" className="fs-mod" aria-label="Retirer une série" disabled={faits[ex].length <= 1} onClick={() => { removeSet(ex); setEditK(null); buzz(10); }}>−</button>
             {faits[ex].map((v, k) => (
-              <span key={k} className={"fs" + (v === null ? "" : v >= E.cible ? " ok" : " ko") + (k === setIdx && !exoDone ? " cur" : "")}>{v ?? "·"}</span>
+              <button type="button" key={k} aria-label={`Série ${k + 1} : ${v ?? "à faire"}`}
+                className={"fs" + (v === null ? "" : v >= E.cible ? " ok" : " ko") + ((editK === null ? k === setIdx && !exoDone : k === editK) ? " cur" : "")}
+                onClick={() => { if (v === null) return; setEditK(editK === k ? null : k); setVal(v); buzz(6); }}>{v ?? "·"}</button>
             ))}
+            <button type="button" className="fs-mod" aria-label="Ajouter une série" disabled={faits[ex].length >= 12} onClick={() => { addSet(ex); setEditK(null); buzz(10); }}>+</button>
           </div>
+          <p className="muted small center-t">Touche une série faite pour la corriger.</p>
           {!exoDone && (
             <>
               <div className="stepper">
@@ -153,12 +167,13 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
                 <button type="button" aria-label="Plus" onClick={() => { setVal((x) => x + (E.type === "duree" ? 5 : 1)); buzz(6); }}>+</button>
               </div>
               {E.type === "duree" ? (
+                editK !== null ? <button className="btn primary big block" type="button" onClick={() => record(val)}>Corriger la série {editK + 1} · {val} s</button> : (
                 <div className="btn-row center">
                   <button className="btn primary big" type="button" onClick={() => { beep(660, 150); setMode({ k: "timer", end: Date.now() + val * 1000, total: val }); }}>Lancer {val} s</button>
                   <button className="btn" type="button" onClick={() => record(val)}>Déjà fait</button>
-                </div>
+                </div>)
               ) : (
-                <button className="btn primary big block" type="button" onClick={() => record(val)}>Série faite · {val}</button>
+                <button className="btn primary big block" type="button" onClick={() => record(val)}>{editK !== null ? `Corriger la série ${editK + 1} · ${val}` : `Série faite · ${val}`}</button>
               )}
               {E.alternative && <p className="muted small center-t">Trop dur : {E.alternative}</p>}
             </>

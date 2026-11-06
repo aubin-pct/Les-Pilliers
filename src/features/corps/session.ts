@@ -15,6 +15,28 @@ export function setSet(i: number, k: number, v: number | null) {
     s.faits[i][k] = v === null || !Number.isFinite(v) ? null : Math.max(0, Math.round(v));
   });
 }
+/** Ajoute une série à un exercice (pendant la séance). */
+export function addSet(i: number) {
+  useStore.getState().act((d) => {
+    const s = d.plans.seance; if (!s || !s.exos[i]) return;
+    s.faits = s.faits ?? emptyFaits(s);
+    if (s.faits[i].length >= 12) return;
+    s.faits[i].push(null);
+    s.exos[i].series = s.faits[i].length;
+  });
+}
+/** Retire une série : la dernière encore vide, sinon la dernière faite. Jamais en dessous d'une. */
+export function removeSet(i: number) {
+  useStore.getState().act((d) => {
+    const s = d.plans.seance; if (!s || !s.exos[i]) return;
+    s.faits = s.faits ?? emptyFaits(s);
+    const f = s.faits[i];
+    if (f.length <= 1) return;
+    const k = f.lastIndexOf(null);
+    f.splice(k >= 0 ? k : f.length - 1, 1);
+    s.exos[i].series = f.length;
+  });
+}
 export function fillExo(i: number) {
   useStore.getState().act((d) => {
     const s = d.plans.seance; if (!s) return;

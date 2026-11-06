@@ -1016,3 +1016,9 @@ input, textarea, select { min-width: 0; }
 /* Repli : le titre garde sa place, le complément se coupe. */
 .fold-t { flex: 0 1 auto; }
 .fold-a { flex: 1 1 auto; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Séries : boutons − / + et séries faites touchables (correction). */
+.focus-sets { align-items: center; }
+button.fs { cursor: pointer; }
+.fs-mod { width: 40px; height: 40px; border-radius: 50%; border: 1px dashed var(--muted); background: none; color: var(--fg); font-size: 20px; line-height: 1; display: grid; place-items: center; }
+.fs-mod:disabled { opacity: .3; }
