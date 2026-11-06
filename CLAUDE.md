@@ -130,6 +130,7 @@ Entrées de page et de cartes par translation seule (jamais d'opacité de dépar
 ## Le Contremaître IA
 
 - `ai/client.ts` : `POST {baseUrl}/chat/completions`, format OpenAI (DeepSeek par défaut, OpenRouter possible). `response_format: json_object` sauf pour le rapport ; sur DeepSeek `thinking` désactivé sauf mode approfondi (examens, rapport). Erreur 400 : un seul nouvel essai sans ces paramètres. JSON lu entre le premier `{` et le dernier `}`.
+- `ai/schemas.ts` : les longueurs (`txt(n)`, `opt(n)`) sont des tailles normales ; `clip` tolère 3 × n et ne coupe qu'en fin de phrase. Ne jamais tronquer un texte de l'IA avec `slice`. `max_tokens` : 2 500 au moins (8 000 en mode approfondi).
 - `ai/prompts.ts` : `PERSONA` et une consigne par usage. Le mot « JSON » doit rester dans chaque consigne JSON. Garde-fous à ne pas affaiblir : dur sur les comportements, jamais sur la personne ; santé, deuil, détresse traités avec respect.
 - `ai/contremaitre.ts` : une fonction par génération, toutes via `ask(prompt, schema, options, silent)`. Elles renvoient `null` sans clé, en démo ou en cas d'échec (message affiché, sauf `silent` pour les générations automatiques) ; l'appelant garde l'état précédent ou applique les règles locales. Mode approfondi (réflexion DeepSeek) pour programme, feuille de route, parcours, examens, mémoire et rapport.
 
