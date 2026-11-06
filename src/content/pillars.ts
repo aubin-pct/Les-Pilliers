@@ -17,7 +17,7 @@ export const PILLARS: PillarDef[] = [
   { id: "corps", name: "Corps", sub: "Physique", roman: "I", rate: 0.025, color: "var(--c-corps)", floor: "1 séance chronométrée ou 1 test" },
   { id: "capital", name: "Capital", sub: "Financier", roman: "II", rate: 0.012, color: "var(--c-capital)", floor: "1 action de mission ou 1 concept examiné" },
   { id: "esprit", name: "Esprit", sub: "Intellect", roman: "III", rate: 0.008, color: "var(--c-esprit)", floor: "1 explication ou 1 révision" },
-  { id: "verbe", name: "Verbe", sub: "Éloquence", roman: "IV", rate: 0.018, color: "var(--c-verbe)", floor: "1 prise de parole de 90 s" },
+  { id: "verbe", name: "Verbe", sub: "Éloquence", roman: "IV", rate: 0.018, color: "var(--c-verbe)", floor: "1 exercice d'éloquence" },
 ];
 
 export const PILLAR_IDS: PillarId[] = PILLARS.map((p) => p.id);
