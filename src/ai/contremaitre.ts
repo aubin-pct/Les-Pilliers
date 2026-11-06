@@ -82,7 +82,7 @@ export const genMemoire = (id: PillarId, nom: string, silent = false) =>
 export async function weeklyReport(data: unknown): Promise<string | null> {
   if (!aiReady()) return null;
   try {
-    const r = String(await callModel(useStore.getState().settings, P.reportPrompt(data), { json: false, deep: true, max: 900 }));
+    const r = String(await callModel(useStore.getState().settings, P.reportPrompt(data), { json: false, deep: true, max: 3000 }));
     return r.length > 20 ? r : null;
   } catch (e) { toast(e instanceof AIError ? e.message : "Le Contremaître n'a pas répondu.", "loss"); return null; }
 }

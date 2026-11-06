@@ -28,7 +28,8 @@ export async function callModel(settings: Settings, user: string, o: CallOptions
     model: settings.model || "deepseek-flash",
     messages: [{ role: "system", content: PERSONA }, { role: "user", content: user }],
     stream: false,
-    max_tokens: deep ? 6000 : o.max ?? 1400,
+    // Assez de place pour que la réponse ne soit jamais coupée par la limite de longueur.
+    max_tokens: deep ? 8000 : Math.max(o.max ?? 0, 2500),
   };
   if (o.json !== false) body.response_format = { type: "json_object" };
   if (isDeepSeek) body.thinking = { type: deep ? "enabled" : "disabled" };

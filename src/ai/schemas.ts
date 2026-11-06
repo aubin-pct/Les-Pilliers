@@ -5,10 +5,24 @@
 import { z } from "zod";
 
 const str = (v: unknown) => (v === null || v === undefined ? v : typeof v === "object" ? JSON.stringify(v) : String(v));
+/**
+ * Coupe un texte trop long SANS le tronquer au milieu d'une phrase. Les longueurs passées aux schémas sont
+ * des tailles « normales » : on tolère trois fois plus avant de couper, et la coupe se fait à la fin d'une
+ * phrase (ou d'un mot, avec « … »). Une réponse de l'IA ne doit jamais s'arrêter net.
+ */
+export function clip(s: string, max: number): string {
+  const lim = max * 3;
+  if (s.length <= lim) return s;
+  const cut = s.slice(0, lim);
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "), cut.lastIndexOf(".\n"), cut.lastIndexOf("\n"));
+  if (end > lim * 0.5) return cut.slice(0, end + 1).trim();
+  const sp = cut.lastIndexOf(" ");
+  return (sp > lim * 0.5 ? cut.slice(0, sp) : cut).trim() + "…";
+}
 /** Texte obligatoire (non vide). */
-const txt = (max = 600) => z.preprocess(str, z.string().trim().min(1)).transform((s) => s.slice(0, max));
+const txt = (max = 600) => z.preprocess(str, z.string().trim().min(1)).transform((s) => clip(s, max));
 /** Texte facultatif (vide par défaut). */
-const opt = (max = 600) => z.preprocess(str, z.string().optional()).transform((s) => (s ?? "").trim().slice(0, max));
+const opt = (max = 600) => z.preprocess(str, z.string().optional()).transform((s) => clip((s ?? "").trim(), max));
 const int = (min: number, max: number, def: number) => z.coerce.number().catch(def).transform((n) => Math.max(min, Math.min(max, Math.round(n))));
 const note10 = int(0, 10, 0);
 const bool = (def: boolean) => z.preprocess((v) => (typeof v === "string" ? v.trim().toLowerCase() === "true" || v.trim().toLowerCase() === "oui" : v), z.boolean()).catch(def);

@@ -171,7 +171,7 @@ export function setProfileField(pilier: string, champ: string, valeur: unknown) 
   if (typeof cur === "number" || cur === null) { const n = Number(valeur); if (!Number.isFinite(n)) throw new Error(`« ${String(valeur)} » n'est pas un nombre.`); v = Math.round(n); }
   else if (Array.isArray(cur)) v = (Array.isArray(valeur) ? valeur : String(valeur).split(/[,;]/)).map((x) => String(x).trim()).filter(Boolean).slice(0, 14);
   else if (champ === "niveau") { if (!["debutant", "intermediaire", "avance"].includes(String(valeur))) throw new Error("Niveau : debutant, intermediaire ou avance."); v = String(valeur); }
-  else v = String(valeur ?? "").slice(0, 400);
+  else v = String(valeur ?? "").slice(0, 1500);
   act((d) => { if (d.profile) { (d.profile[id] as unknown as Record<string, unknown>)[champ] = v; d.profile.updated = Date.now(); } });
   return "Profil mis à jour.";
 }
