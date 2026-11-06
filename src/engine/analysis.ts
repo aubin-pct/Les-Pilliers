@@ -95,3 +95,26 @@ export function analyzeAudio(rms: number[]): AudioMetrics | null {
   }
   return { speak: voiced * FRAME, pauses: pauses.length, longest: pauses.length ? Math.max(...pauses) : 0, ratio: voiced / (last - first + 1), env };
 }
+
+/**
+ * Assemble les morceaux renvoyés par la reconnaissance vocale. Chrome sur Android renvoie souvent chaque
+ * phrase plusieurs fois, de plus en plus longue (« je », « je veux », « je veux parler ») : un morceau qui
+ * prolonge le précédent le remplace, un morceau déjà contenu dans le précédent est ignoré.
+ */
+export function mergeRecognized(parts: string[]): string {
+  const key = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const out: string[] = [];
+  for (const raw of parts) {
+    const t = raw.trim();
+    if (!t) continue;
+    const last = out[out.length - 1];
+    if (last !== undefined) {
+      const kl = key(last), kt = key(t);
+      if (kt === kl) continue;
+      if (kt.startsWith(kl)) { out[out.length - 1] = t; continue; }
+      if (kl.startsWith(kt) || kl.endsWith(kt)) continue;
+    }
+    out.push(t);
+  }
+  return out.join(" ").replace(/\s+/g, " ").trim();
+}

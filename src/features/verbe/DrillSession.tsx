@@ -49,6 +49,7 @@ export function DrillSession({ drill, sujetHint, onClose }: { drill: DrillId; su
   const [left, setLeft] = useState(secs);
   const [hud, setHud] = useState({ level: 0, tics: 0, flash: 0, wpm: 0, live: 0, silences: 0, text: "" });
   const [typed, setTyped] = useState("");
+  const [noText, setNoText] = useState(false);
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [prev, setPrev] = useState<Attempt | null>(null);
   const cap = useRef<Capture | null>(null);
@@ -101,13 +102,14 @@ export function DrillSession({ drill, sujetHint, onClose }: { drill: DrillId; su
 
   /* ---------- Compte à rebours puis départ ---------- */
   const go = async () => {
-    setAttempt(null); setTyped(""); typedRef.current = ""; stopping.current = false;
+    setAttempt(null); setTyped(""); setNoText(false); typedRef.current = ""; stopping.current = false;
     marks.current = []; ticMax.current = 0; phaseIdx.current = 0; frames.current = []; sil.current = { lastVoice: 0, counted: false, n: 0, voiced: false };
     setHud({ level: 0, tics: 0, flash: 0, wpm: 0, live: 0, silences: 0, text: "" });
     if (mic) {
       const capture = new Capture({
         onFrame: (r, f) => { frames.current.push({ r, f }); if (frames.current.length > 80) frames.current.shift(); },
         onTranscript: (fin, int) => onText((fin + " " + int).trim()),
+        onRecognitionFailed: () => setNoText(true),
       });
       try { await capture.start(); }
       catch { toast("Micro refusé ou absent. Passe en mode clavier dans les réglages.", "loss"); return; }
@@ -284,7 +286,7 @@ export function DrillSession({ drill, sujetHint, onClose }: { drill: DrillId; su
             {drill === "silence" ? <div className="hud-tic"><b className="num">{hud.silences}/3</b><span>silences</span></div>
               : <div className="hud-voice"><i><b style={{ width: `${hud.live * 100}%` }} /></i><span>{hud.live < 0.3 ? "voix plate" : hud.live < 0.6 ? "voix correcte" : "voix vivante"}</span></div>}
           </div>
-          {mic ? <div className="dr-live-text">{hud.text ? <Transcript text={hud.text.slice(-160)} /> : <span className="muted">Parle.</span>}</div>
+          {mic ? <div className="dr-live-text">{hud.text ? <Transcript text={hud.text.slice(-160)} /> : <span className="muted">{noText ? "Transcription indisponible sur ce téléphone : tu es jugé sur la voix (débit, silences, relief)." : "Parle."}</span>}</div>
             : <textarea className="dr-type" autoFocus value={typed} onChange={(e) => { setTyped(e.target.value); typedRef.current = e.target.value; }} placeholder="Micro du clavier, et parle." />}
           <button type="button" className="btn danger block" onClick={() => void finish(false)}>Terminer</button>
         </div>

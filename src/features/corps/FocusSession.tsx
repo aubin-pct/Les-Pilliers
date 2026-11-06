@@ -44,24 +44,29 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
     return () => { clearInterval(t); void keepAwake(false); document.body.style.overflow = ""; release(); };
   }, []);
 
-  // Fin des comptes à rebours (repos, série chronométrée).
+  // Fin des comptes à rebours (repos, série chronométrée) : traitée une seule fois par compte à rebours.
+  // (L'enregistrement de la série met le store à jour, ce qui refait un rendu avant que le mode ne change :
+  // sans ce verrou, la fin du minuteur s'exécutait en boucle et validait les séries suivantes.)
+  const ended = useRef(0);
   useEffect(() => {
-    if ((mode.k === "rest" || mode.k === "timer") && now >= mode.end) {
-      beep(990, 350); buzz([180, 80, 180]);
-      if (mode.k === "timer") { record(mode.total); return; }
-      setMode({ k: "set" });
-      if (exoDone) next();
-    }
-  });
+    if ((mode.k !== "rest" && mode.k !== "timer") || now < mode.end || ended.current === mode.end) return;
+    ended.current = mode.end;
+    beep(990, 350); buzz([180, 80, 180]);
+    if (mode.k === "timer") { record(mode.total); return; }
+    setMode({ k: "set" });
+    if (exoDone) next();
+  }, [now, mode]);
 
   function record(v: number) {
-    setSet(ex, setIdx, v);
-    buzz([25, 40, 25]);
     const lastSetOfExo = setIdx >= E.series - 1;
     const allDone = doneSets + 1 >= totalSets;
-    if (allDone) { setMode({ k: "end" }); return; }
-    if (E.repos > 0) setMode({ k: "rest", end: Date.now() + E.repos * 1000, total: E.repos });
-    else { setMode({ k: "set" }); if (lastSetOfExo) next(); }
+    // Le mode change avant l'écriture de la série, pour qu'aucun rendu intermédiaire ne la compte deux fois.
+    if (allDone) setMode({ k: "end" });
+    else if (E.repos > 0) setMode({ k: "rest", end: Date.now() + E.repos * 1000, total: E.repos });
+    else setMode({ k: "set" });
+    setSet(ex, setIdx, v);
+    buzz([25, 40, 25]);
+    if (!allDone && E.repos <= 0 && lastSetOfExo) next();
   }
   function next() {
     const f = faitsOf(plan);

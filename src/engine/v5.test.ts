@@ -93,3 +93,13 @@ describe("fusion v5", () => {
     expect(mergeChantier(base, phone, mac, T0).knowledgeMap!.domaines[0].nom).toBe("B");
   });
 });
+
+import { mergeRecognized } from "./analysis";
+describe("reconnaissance vocale", () => {
+  it("fusionne les répétitions d'Android sans perdre de phrases", () => {
+    expect(mergeRecognized(["je", "je veux", "je veux parler"])).toBe("je veux parler");
+    expect(mergeRecognized(["Bonjour.", "bonjour", "je m'appelle Aubin"])).toBe("Bonjour. je m'appelle Aubin");
+    expect(mergeRecognized(["première phrase", "deuxième phrase"])).toBe("première phrase deuxième phrase");
+    expect(mergeRecognized(["", "  ", "texte"])).toBe("texte");
+  });
+});

@@ -4,17 +4,9 @@
  */
 import { FRAME } from "@/engine/analysis";
 import { detectPitch } from "@/engine/eloquence";
+import { canDictate, Recognizer } from "@/lib/voice";
 
-type SR = {
-  lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
-  onresult: ((e: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  start(): void; stop(): void;
-};
-const SRClass = (window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR }).SpeechRecognition
-  ?? (window as unknown as { webkitSpeechRecognition?: new () => SR }).webkitSpeechRecognition;
-export const hasSpeechRecognition = !!SRClass;
+export const hasSpeechRecognition = canDictate;
 
 export interface CaptureEvents {
   onLevel?: (rms: number) => void;
@@ -33,21 +25,19 @@ export class Capture {
   private mime = "";
   private ctx: AudioContext | null = null;
   private sampler: ReturnType<typeof setInterval> | null = null;
-  private recog: SR | null = null;
-  private running = false;
+  private recog: Recognizer | null = null;
   rms: number[] = [];
   pitch: (number | null)[] = [];
   finals = "";
   interim = "";
   recognized = false;
-  recogFailed = !SRClass;
+  recogFailed = !canDictate;
 
   constructor(private ev: CaptureEvents = {}) {}
 
   /** Demande le micro et démarre tout. Lève une erreur si le micro est refusé ou absent. */
   async start() {
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-    this.running = true;
     const mimes = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg;codecs=opus"];
     this.mime = (typeof MediaRecorder !== "undefined" && mimes.find((m) => MediaRecorder.isTypeSupported?.(m))) || "";
     try {
@@ -71,37 +61,20 @@ export class Capture {
         this.rms.push(r); this.pitch.push(f); this.ev.onLevel?.(r); this.ev.onFrame?.(r, f);
       }, FRAME * 1000);
     } catch { this.ctx = null; }
-    if (SRClass) this.startRecognition();
+    if (canDictate) this.startRecognition();
   }
 
   private startRecognition() {
-    try {
-      const r = new SRClass!();
-      r.lang = "fr-FR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
-      r.onresult = (e) => {
-        let interim = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          const t = e.results[i][0].transcript;
-          if (e.results[i].isFinal) this.finals += (this.finals && !/\s$/.test(this.finals) ? " " : "") + t.trim();
-          else interim += t;
-        }
-        this.interim = interim; this.recognized = true;
-        this.ev.onTranscript?.(this.finals, interim);
-      };
-      r.onerror = (e) => {
-        if (["not-allowed", "service-not-allowed", "audio-capture", "language-not-supported", "network"].includes(e.error)) {
-          this.recogFailed = true; this.ev.onRecognitionFailed?.();
-        }
-      };
-      // Chrome coupe la reconnaissance après un silence : on la relance tant que l'oral dure.
-      r.onend = () => { if (this.running && !this.recogFailed && this.recog === r) { try { r.start(); } catch { /* déjà relancée */ } } };
-      this.recog = r; r.start();
-    } catch { this.recogFailed = true; this.recog = null; this.ev.onRecognitionFailed?.(); }
+    const r = new Recognizer({
+      text: (f, i) => { this.finals = f; this.interim = i; this.recognized = true; this.ev.onTranscript?.(f, i); },
+      fail: () => { this.recogFailed = true; this.ev.onRecognitionFailed?.(); },
+    });
+    this.recog = r;
+    r.start();
   }
 
   /** Arrête tout et rend l'audio, les niveaux et la transcription. */
   async stop(): Promise<CaptureResult> {
-    this.running = false;
     if (this.recog && !this.recogFailed) {
       try { this.recog.stop(); } catch { /* rien */ }
       await new Promise((r) => setTimeout(r, 600)); // laisse arriver la dernière phrase
@@ -120,10 +93,9 @@ export class Capture {
 
   /** Libère le micro sans rien garder (abandon). */
   release() {
-    this.running = false;
     if (this.sampler) clearInterval(this.sampler);
     this.sampler = null;
-    try { this.recog?.stop(); } catch { /* rien */ }
+    this.recog?.abort();
     this.recog = null;
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;

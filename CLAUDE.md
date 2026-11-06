@@ -121,7 +121,7 @@ Entrées de page et de cartes par translation seule (jamais d'opacité de dépar
 
 ## La Tribune (Verbe)
 
-- `features/verbe/recorder.ts` (`Capture`) : `getUserMedia` → `MediaRecorder` (archive), `AnalyserNode` échantillonné toutes les 50 ms, `SpeechRecognition` fr-FR continue relancée à chaque `end`. Si la reconnaissance échoue, l'oral est jugé sur la voix seule (25 s de voix au lieu de 40 mots).
+- `features/verbe/recorder.ts` (`Capture`) : `getUserMedia` → `MediaRecorder` (archive), `AnalyserNode` échantillonné toutes les 50 ms, `Recognizer` (`lib/voice.ts`, partagé avec la dictée) : texte reconstruit à chaque résultat et répétitions d'Android fusionnées (`mergeRecognized`), sessions courtes relancées sur Android, arrêt après 4 coupures immédiates. Si la reconnaissance échoue, l'oral est jugé sur la voix seule (25 s de voix au lieu de 40 mots).
 - `engine/analysis.ts` : `analyzeAudio` (seuil adaptatif, blancs ≥ 0,8 s, enveloppe de 72 points) et `analyzeText` (mots/min, tics, diversité). Métrique principale : hésitations/min = tics/min + blancs/min.
 - Mode clavier : dictée du clavier dans une zone de texte, sans enregistrement ; bascule automatique si le micro est refusé.
 - Crochet de test : `window.__tribune = { secs, inject }` raccourcit l'exercice et injecte une transcription.
