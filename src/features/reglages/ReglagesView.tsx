@@ -13,6 +13,7 @@ import { Card, Foreman, Sheet, Thinking } from "@/ui/kit";
 import { HoldButton } from "@/ui/HoldButton";
 import { SyncCard } from "./SyncCard";
 import { MicTest } from "./MicTest";
+import { UpdateCard } from "./UpdateCard";
 
 export function ReglagesView() {
   const settings = useSettings();
@@ -56,6 +57,7 @@ export function ReglagesView() {
         </Card>
       )}
 
+      <UpdateCard />
       <SyncCard />
 
       <Card title="Contremaître IA" aside={<span className={"pill " + (aiEnabled(settings) ? "on" : "")}>{aiEnabled(settings) ? "Branché" : "Débranché"}</span>}>

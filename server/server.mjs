@@ -94,7 +94,7 @@ export function createServer(opts = {}) {
     if (!st) { res.writeHead(404); res.end(); return; }
     const ext = path.extname(file);
     const immutable = /\/assets\//.test(file);
-    const noCache = ext === ".html" || /sw\.js$|workbox-|registerSW|manifest/.test(file);
+    const noCache = ext === ".html" || /sw\.js$|workbox-|registerSW|manifest|version\.json$/.test(file);
     res.writeHead(200, {
       "Content-Type": MIME[ext] ?? "application/octet-stream", "Content-Length": st.size,
       "Cache-Control": noCache ? "no-cache" : immutable ? "public, max-age=31536000, immutable" : "public, max-age=3600",

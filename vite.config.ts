@@ -12,6 +12,8 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   plugins: [
     react(),
+    // version.json : lu par l'appli pour savoir si une version plus récente est publiée (jamais mis en cache par le service worker).
+    { name: "version-json", generateBundle() { this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ version: pkg.version }) }); } },
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["icon-192.png", "icon-512.png"],

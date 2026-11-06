@@ -43,7 +43,7 @@ L'application parle par la voix du Contremaître. Chaque page commence par son v
 - **État** : Zustand 5 avec immer (mutations dans des brouillons) et persist (localStorage).
 - **Navigation** : React Router 6 en `HashRouter` (`#/corps`…), compatible GitHub Pages sans réécriture d'URL.
 - **Médias** : IndexedDB via `idb` (audio des oraux, photos de preuve).
-- **PWA** : `vite-plugin-pwa` (Workbox, `generateSW`, mise à jour automatique), hors ligne sauf l'IA.
+- **PWA** : `vite-plugin-pwa` (Workbox, `generateSW`, mise à jour automatique), hors ligne sauf l'IA. `lib/update.ts` : le service worker vérifie à l'ouverture, au retour sur l'appli et toutes les 30 min ; `version.json` (émis au build, jamais précaché) de GitHub Pages donne la version publiée. Appli servie par le Mac (ts.net, localhost) en retard : bandeau au Temple et carte « Version » dans les réglages (commande `git pull && docker compose up -d --build`, rechargement forcé).
 - **Tests** : Vitest sur le moteur (`src/engine/*.test.ts`).
 - **Déploiement** : GitHub Actions (`.github/workflows/deploy.yml`) → tests, build, GitHub Pages. Dans le dépôt : Settings → Pages → Source « GitHub Actions ». `base: "./"` : l'appli marche dans n'importe quel sous-dossier.
 

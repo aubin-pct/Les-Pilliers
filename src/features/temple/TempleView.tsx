@@ -16,6 +16,7 @@ import { Dossier, ExcuseBars, HistChart } from "./Charts";
 import { AccountSheet } from "./AccountSheet";
 import { MemoryCard } from "./Memory";
 import { profileGaps } from "@/content/profile";
+import { newer, useUpdate } from "@/lib/update";
 
 export function TempleView() {
   const c = useChantier()!;
@@ -26,6 +27,7 @@ export function TempleView() {
   const now = useNow(30_000);
   const nav = useNavigate();
   const [account, setAccount] = useState(false);
+  const latest = useUpdate((s) => s.latest);
   const [reporting, setReporting] = useState(false);
   const monthEx = c.excuses.filter((e) => e.ts > now - 30 * DAY).length;
   const rest = startOfDay(now) + DAY - now;
@@ -59,6 +61,12 @@ export function TempleView() {
       )}
 
       <CoachHead scope="temple" />
+
+      {latest && newer(latest, __APP_VERSION__) && (
+        <button type="button" className="alert-row soft" onClick={() => nav("/reglages")}>
+          <span>Version {latest} publiée · tu as la {__APP_VERSION__}</span><span className="go">Mettre à jour ›</span>
+        </button>
+      )}
 
       {c.pending.length > 0 && (
         <button type="button" className="alert-row" onClick={() => setAccount(true)}>
