@@ -11,7 +11,9 @@ import { fmtDur } from "@/lib/format";
 import { openLayer } from "@/lib/layers";
 import { toast } from "@/store/ui";
 import { HoldButton } from "@/ui/HoldButton";
-import { addSet, faitsOf, finishSession, removeSet, setSet } from "./session";
+import { addSet, faitsOf, finishSession, parseKg, poidsOf, removeSet, setPoids, setSet } from "./session";
+
+const fkg = (n: number) => String(n).replace(".", ",");
 
 type Mode = { k: "set" } | { k: "rest"; end: number; total: number } | { k: "timer"; end: number; total: number } | { k: "end" };
 
@@ -34,7 +36,12 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
   const exoDone = faits[ex].every((x) => x !== null) && editK === null;
   const lastDone = [...faits[ex]].reverse().find((x) => x !== null);
   const [val, setVal] = useState<number>(lastDone ?? E.cible);
-  useEffect(() => { setVal(([...faitsOf(plan)[ex]].reverse().find((x) => x !== null) ?? plan.exos[ex].cible) as number); }, [ex]);
+  // Poids : celui de la dernière série faite sur cet exercice, sinon celui prévu par la séance ; modifiable à chaque série.
+  const poids = poidsOf(plan);
+  const kgStart = (i: number) => { const p = poidsOf(plan)[i]; const f = faitsOf(plan)[i]; const last = p.filter((x, k) => x !== null && f[k] !== null).pop(); return last ?? parseKg(plan.exos[i].charge); };
+  const [kg, setKg] = useState<number | null>(kgStart(ex));
+  useEffect(() => { setVal(([...faitsOf(plan)[ex]].reverse().find((x) => x !== null) ?? plan.exos[ex].cible) as number); setKg(kgStart(ex)); }, [ex]);
+  const stepKg = (d: number) => { setKg((x) => Math.max(0, Math.round(((x ?? 0) + d) * 4) / 4)); buzz(6); };
 
   const totalSets = faits.reduce((a, f) => a + f.length, 0);
   const doneSets = faits.reduce((a, f) => a + f.filter((x) => x !== null).length, 0);
@@ -63,7 +70,7 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
   function record(v: number) {
     if (editK !== null) {
       const after = faits[ex].map((x, k) => (k === editK ? v : x));
-      setSet(ex, editK, v); setEditK(null); buzz([25, 40, 25]);
+      setSet(ex, editK, v); if (kg !== null) setPoids(ex, editK, kg); setEditK(null); buzz([25, 40, 25]);
       setVal([...after].reverse().find((x) => x !== null) ?? E.cible); // on revient à la dernière série faite
       return;
     }
@@ -74,6 +81,7 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
     else if (E.repos > 0) setMode({ k: "rest", end: Date.now() + E.repos * 1000, total: E.repos });
     else setMode({ k: "set" });
     setSet(ex, setIdx, v);
+    if (kg !== null) setPoids(ex, setIdx, kg);
     buzz([25, 40, 25]);
     if (!allDone && E.repos <= 0 && lastSetOfExo) next();
   }
@@ -154,7 +162,7 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
             {faits[ex].map((v, k) => (
               <button type="button" key={k} aria-label={`Série ${k + 1} : ${v ?? "à faire"}`}
                 className={"fs" + (v === null ? "" : v >= E.cible ? " ok" : " ko") + ((editK === null ? k === setIdx && !exoDone : k === editK) ? " cur" : "")}
-                onClick={() => { if (v === null) return; setEditK(editK === k ? null : k); setVal(v); buzz(6); }}>{v ?? "·"}</button>
+                onClick={() => { if (v === null) return; setEditK(editK === k ? null : k); setVal(v); if (poids[ex][k] !== null) setKg(poids[ex][k]); buzz(6); }}>{v ?? "·"}{poids[ex][k] !== null && <small>{fkg(poids[ex][k]!)}</small>}</button>
             ))}
             <button type="button" className="fs-mod" aria-label="Ajouter une série" disabled={faits[ex].length >= 12} onClick={() => { addSet(ex); setEditK(null); buzz(10); }}>+</button>
           </div>
@@ -166,6 +174,14 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
                 <span className="stepper-n num" aria-live="polite">{val}<small>{E.type === "duree" ? "s" : "reps"}</small></span>
                 <button type="button" aria-label="Plus" onClick={() => { setVal((x) => x + (E.type === "duree" ? 5 : 1)); buzz(6); }}>+</button>
               </div>
+              {kg !== null ? (
+                <div className="kg-row">
+                  <button type="button" aria-label="Poids moins" onClick={() => stepKg(-2.5)}>−</button>
+                  <label className="kg-in"><input type="number" inputMode="decimal" step="0.5" min="0" aria-label="Poids en kg" value={kg} onChange={(e) => { const n = Number(e.target.value.replace(",", ".")); setKg(Number.isFinite(n) ? Math.max(0, n) : 0); }} /><small>kg</small></label>
+                  <button type="button" aria-label="Poids plus" onClick={() => stepKg(2.5)}>+</button>
+                  <button type="button" className="kg-off" aria-label="Sans poids" onClick={() => setKg(null)}>✕</button>
+                </div>
+              ) : <button className="linkish small center-t" type="button" onClick={() => setKg(parseKg(E.charge) ?? 10)}>+ Ajouter un poids</button>}
               {E.type === "duree" ? (
                 editK !== null ? <button className="btn primary big block" type="button" onClick={() => record(val)}>Corriger la série {editK + 1} · {val} s</button> : (
                 <div className="btn-row center">
@@ -173,7 +189,7 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
                   <button className="btn" type="button" onClick={() => record(val)}>Déjà fait</button>
                 </div>)
               ) : (
-                <button className="btn primary big block" type="button" onClick={() => record(val)}>{editK !== null ? `Corriger la série ${editK + 1} · ${val}` : `Série faite · ${val}`}</button>
+                <button className="btn primary big block" type="button" onClick={() => record(val)}>{editK !== null ? `Corriger la série ${editK + 1} · ${val}` : `Série faite · ${val}`}{kg !== null ? ` × ${fkg(kg)} kg` : ""}</button>
               )}
               {E.alternative && <p className="muted small center-t">Trop dur : {E.alternative}</p>}
             </>

@@ -107,7 +107,7 @@ Carrière de pierre la nuit, temple en construction. Matières : granit (grain S
 - `Sheet` : panneau qui se ferme en le faisant glisser vers le bas (zone de préhension), ou avec le retour.
 - Barre d'onglets : chaque pilier porte une jauge de hauteur et un point rouge si le plancher est nu.
 - Temple : piliers cliquables (ouvrent leur chantier).
-- `features/corps/FocusSession.tsx` : séance plein écran, un exercice et une série à la fois (− / + au pouce, « Série faite », anneau de repos +15 s, séries chronométrées, balayage gauche/droite, fin avec ressenti et validation maintenue). Actions partagées avec la vue liste dans `features/corps/session.ts`.
+- `features/corps/FocusSession.tsx` : séance plein écran, un exercice et une série à la fois (− / + au pouce, poids par série (`SeancePlan.poids`, ±2,5 kg ou saisi, repris de la série précédente, puis `SetLog.poids`), séries ajoutées/retirées (`addSet`/`removeSet`), série faite touchée = correction, « Série faite », anneau de repos +15 s, séries chronométrées, balayage gauche/droite, fin avec ressenti et validation maintenue). Actions partagées avec la vue liste dans `features/corps/session.ts`.
 - Tribune : anneau de temps restant et halo qui réagit au volume de la voix (`--lvl`).
 
 ### Mouvement

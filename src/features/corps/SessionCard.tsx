@@ -10,7 +10,7 @@ import { fallbackSeance } from "@/engine/fallbacks";
 import { POINTS, setsRatio } from "@/engine/scoring";
 import { HoldButton } from "@/ui/HoldButton";
 import { FocusSession } from "./FocusSession";
-import { addSet, faitsOf, fillExo, finishSession, removeSet, setSet } from "./session";
+import { addSet, faitsOf, fillExo, finishSession, parseKg, poidsOf, removeSet, setPoids, setSet } from "./session";
 import type { Chantier, SeancePlan } from "@/engine/types";
 import { beep, buzz, keepAwake } from "@/lib/device";
 import { dayKey, fmtDur } from "@/lib/format";
@@ -133,7 +133,8 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
   const [left, setLeft] = useState(0);
   const [rpe, setRpe] = useState<number | null>(null);
   const [note, setNote] = useState("");
-  const faits = faitsOf(plan);
+  const faits = faitsOf(plan), poids = poidsOf(plan);
+  const [withKg, setWithKg] = useState<Set<number>>(new Set());
   const { done, total } = setsRatio(faits.map((f) => ({ faits: f })));
 
   useEffect(() => { void keepAwake(true); return () => { void keepAwake(false); }; }, []);
@@ -166,11 +167,18 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
             <div className="sets">
               <button className="btn small ghost" type="button" aria-label={`${e.nom} : retirer une série`} disabled={faits[i].length <= 1} onClick={() => removeSet(i)}>−</button>
               {faits[i].map((v, k) => (
-                <input key={k} type="number" inputMode="numeric" aria-label={`${e.nom}, série ${k + 1}`} placeholder={String(e.cible)} value={v ?? ""}
-                  className={v === null ? "" : v >= e.cible ? "ok" : "ko"} onChange={(x) => setSet(i, k, x.target.value === "" ? null : Number(x.target.value.replace(",", ".")))} onBlur={() => committed(i, k)} />
+                <span className="set-cell" key={k}>
+                  <input type="number" inputMode="numeric" aria-label={`${e.nom}, série ${k + 1}`} placeholder={String(e.cible)} value={v ?? ""}
+                    className={v === null ? "" : v >= e.cible ? "ok" : "ko"} onChange={(x) => setSet(i, k, x.target.value === "" ? null : Number(x.target.value.replace(",", ".")))} onBlur={() => committed(i, k)} />
+                  {(withKg.has(i) || poids[i].some((p) => p !== null) || parseKg(e.charge) !== null) && (
+                    <input type="number" inputMode="decimal" className="kg" aria-label={`${e.nom}, série ${k + 1}, poids en kg`} placeholder={String(parseKg(e.charge) ?? "kg")} value={poids[i][k] ?? ""}
+                      onChange={(x) => setPoids(i, k, x.target.value === "" ? null : Number(x.target.value.replace(",", ".")))} />
+                  )}
+                </span>
               ))}
               <button className="btn small ghost" type="button" aria-label={`${e.nom} : ajouter une série`} disabled={faits[i].length >= 12} onClick={() => addSet(i)}>+</button>
               <button className="btn small ghost" type="button" onClick={() => fillExo(i)}>Tout réussi</button>
+              {!(withKg.has(i) || poids[i].some((p) => p !== null) || parseKg(e.charge) !== null) && <button className="btn small ghost" type="button" onClick={() => setWithKg((s) => new Set(s).add(i))}>+ kg</button>}
             </div>
             {e.alternative && <span className="muted" style={{ fontSize: 12 }}>Trop dur : {e.alternative}</span>}
           </div>

@@ -28,7 +28,7 @@ export interface Seance {
   logs?: SetLog[];
 }
 
-export interface SetLog { exo: string; type: "reps" | "duree"; cible: number; faits: (number | null)[]; charge?: string }
+export interface SetLog { exo: string; type: "reps" | "duree"; cible: number; faits: (number | null)[]; charge?: string; /** Poids réellement utilisé à chaque série (kg). */ poids?: (number | null)[] }
 
 export interface TestRecord { ts: number; kind: TestId; value: number; counted: boolean }
 
@@ -68,6 +68,8 @@ export interface SeancePlan {
   echauffement: string; exos: Exo[]; retourAuCalme: string; ajustement: string;
   /** Saisie en cours, série par série (persistée : survit à une fermeture de l'appli). */
   faits?: (number | null)[][];
+  /** Poids utilisé à chaque série (kg), aligné sur `faits`. */
+  poids?: (number | null)[][];
   /** Conditions données à la préparation (reprises quand on la modifie). */
   conditions?: SeanceConditions;
   /** Demandes déjà appliquées à cette séance, dans l'ordre. */

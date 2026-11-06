@@ -1022,3 +1022,15 @@ input, textarea, select { min-width: 0; }
 button.fs { cursor: pointer; }
 .fs-mod { width: 40px; height: 40px; border-radius: 50%; border: 1px dashed var(--muted); background: none; color: var(--fg); font-size: 20px; line-height: 1; display: grid; place-items: center; }
 .fs-mod:disabled { opacity: .3; }
+
+/* Poids par série */
+.fs { flex-direction: column; gap: 0; line-height: 1.05; }
+.fs small { font-size: 10px; font-weight: 500; opacity: .85; }
+.kg-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) 52px 36px; gap: 8px; align-items: center; }
+.kg-row > button { height: 52px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font-size: 24px; }
+.kg-row .kg-off { height: 36px; width: 36px; border-radius: 50%; font-size: 13px; color: var(--muted); background: none; }
+.kg-in { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
+.kg-in input { width: 100%; max-width: 130px; text-align: center; font-family: var(--f-display); font-weight: 900; font-size: 38px; padding: 4px; background: transparent; border: 0; border-bottom: 2px solid var(--line); border-radius: 0; color: var(--fg); }
+.kg-in small { font-family: var(--f-mono); color: var(--muted); font-size: 14px; }
+.set-cell { display: inline-grid; gap: 3px; }
+.set-cell .kg { font-size: 16px; padding: 4px 6px; width: 58px; color: var(--muted); }

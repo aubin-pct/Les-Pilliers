@@ -40,7 +40,7 @@ export function corpsContext(c: Chantier, now: number) {
     records: TESTS.map((T) => ({ test: T.name, record: bestOf(c, T.id), unite: T.unit })).filter((r) => r.record !== null),
     dernieres_seances: c.seances.slice(-8).map((s) => ({
       date: fdate(s.ts), titre: s.type, minutes: s.dur, series: `${s.done}/${s.total}`, ressenti_effort: s.rpe ?? null, note: s.note || undefined,
-      detail: s.logs?.map((l) => `${l.exo} : ${l.faits.map((x) => x ?? "×").join("/")} (cible ${l.cible}${l.type === "duree" ? " s" : ""}${l.charge ? ", " + l.charge : ""})`),
+      detail: s.logs?.map((l) => `${l.exo} : ${l.faits.map((x, k) => (x === null ? "×" : l.poids?.[k] != null ? `${x}@${l.poids[k]}kg` : x)).join(" / ")} (cible ${l.cible}${l.type === "duree" ? " s" : ""}${l.charge ? ", prévu " + l.charge : ""})`),
     })),
     seances_7_derniers_jours: c.seances.filter((s) => s.ts > now - 7 * DAY).length,
     seance_du_jour: c.plans.seance?.date === dayKey(now) ? {

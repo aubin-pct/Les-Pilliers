@@ -7,6 +7,22 @@ import { gainToast } from "@/store/ui";
 
 export const emptyFaits = (p: SeancePlan) => p.exos.map((e) => Array<number | null>(e.series).fill(null));
 export const faitsOf = (p: SeancePlan) => p.faits ?? emptyFaits(p);
+/** Poids par série (kg), toujours aligné sur les séries. */
+export const poidsOf = (p: SeancePlan) => faitsOf(p).map((f, i) => f.map((_, k) => p.poids?.[i]?.[k] ?? null));
+/** Poids prévu par la séance (« 20 kg », « 2 × 12,5 kg »…), ou null. */
+export function parseKg(charge?: string): number | null {
+  const m = charge?.match(/(\d+(?:[.,]\d+)?)\s*kg/i);
+  return m ? Number(m[1].replace(",", ".")) : null;
+}
+const alignPoids = (s: SeancePlan) => { s.poids = s.faits!.map((f, i) => f.map((_, k) => s.poids?.[i]?.[k] ?? null)); };
+
+export function setPoids(i: number, k: number, kg: number | null) {
+  useStore.getState().act((d) => {
+    const s = d.plans.seance; if (!s) return;
+    s.faits = s.faits ?? emptyFaits(s); alignPoids(s);
+    s.poids![i][k] = kg === null || !Number.isFinite(kg) ? null : Math.max(0, Math.round(kg * 4) / 4);
+  });
+}
 
 export function setSet(i: number, k: number, v: number | null) {
   useStore.getState().act((d) => {
@@ -21,7 +37,9 @@ export function addSet(i: number) {
     const s = d.plans.seance; if (!s || !s.exos[i]) return;
     s.faits = s.faits ?? emptyFaits(s);
     if (s.faits[i].length >= 12) return;
+    alignPoids(s);
     s.faits[i].push(null);
+    s.poids![i].push(s.poids![i][s.poids![i].length - 1] ?? null);
     s.exos[i].series = s.faits[i].length;
   });
 }
@@ -32,8 +50,9 @@ export function removeSet(i: number) {
     s.faits = s.faits ?? emptyFaits(s);
     const f = s.faits[i];
     if (f.length <= 1) return;
-    const k = f.lastIndexOf(null);
-    f.splice(k >= 0 ? k : f.length - 1, 1);
+    alignPoids(s);
+    const k = f.lastIndexOf(null), at = k >= 0 ? k : f.length - 1;
+    f.splice(at, 1); s.poids![i].splice(at, 1);
     s.exos[i].series = f.length;
   });
 }
@@ -50,9 +69,9 @@ export function finishSession(rpe: number | null, note: string): string | null {
   const st = useStore.getState();
   const c = st.demo ?? st.chantier; const plan = c?.plans.seance;
   if (!c || !plan) return "Aucune séance en cours.";
-  const faits = faitsOf(plan);
+  const faits = faitsOf(plan), poids = poidsOf(plan);
   const dur = Math.round((Date.now() - (c.seanceStart ?? Date.now())) / 60000);
-  const logs = plan.exos.map((e, i) => ({ exo: e.nom, type: e.type, cible: e.cible, faits: faits[i], charge: e.charge || undefined }));
+  const logs = plan.exos.map((e, i) => ({ exo: e.nom, type: e.type, cible: e.cible, faits: faits[i], charge: e.charge || undefined, ...(poids[i].some((x) => x !== null) ? { poids: poids[i] } : {}) }));
   const { done, total } = setsRatio(logs);
   if (dur < 5) return `${dur} min de chrono. Cinq minimum.`;
   if (done < total / 2) return `${done}/${total} séries. Il en faut au moins la moitié.`;
