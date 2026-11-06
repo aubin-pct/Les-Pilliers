@@ -18,10 +18,16 @@ ${demande ? `Demande de l'utilisateur : « ${demande} »\n` : ""}
 Construis son PROGRAMME d'entraînement pour les semaines à venir, adapté à ses objectifs, son niveau, son matériel, son temps, ses contraintes et ses résultats. Respecte strictement le nombre de séances par semaine et les blessures déclarées.
 Réponds uniquement en JSON : {"titre": string (5 mots max), "logique": string (2-3 phrases : pourquoi ce découpage pour lui), "semaine": [{"jour": "lundi"|"mardi"|…, "focus": string}] (un élément par séance, jours de repos exclus), "progression": string (règle de progression concrète semaine après semaine)}`;
 
-export const seancePrompt = (ctx: unknown, ajust: { minutes: number; energie: string; materiel: string[]; douleur: string; demande: string }) => `[TACHE:seance]
+export const seancePrompt = (ctx: unknown, ajust: { minutes: number; energie: string; materiel: string[]; douleur: string; demande: string }, actuelle?: { seance: unknown; demandes: string[] }) => `[TACHE:seance]
 ${dossier(ctx)}
-Conditions d'aujourd'hui : ${ajust.minutes} minutes disponibles, énergie ${ajust.energie}, matériel disponible : ${ajust.materiel.join(", ") || "aucun"}${ajust.douleur ? `, douleur ou gêne : ${ajust.douleur}` : ""}${ajust.demande ? `, demande : « ${ajust.demande} »` : ""}.
-Prépare la SÉANCE DU JOUR : suis le programme (focus prévu pour ce jour si possible), applique la surcharge progressive à partir des séances précédentes (séries réussies → on monte ; échouées ou effort ≥ 9 → on consolide), tiens dans le temps disponible repos compris, n'utilise que le matériel disponible, évite toute sollicitation de la zone douloureuse. Énergie basse : volume réduit mais séance faite.
+Conditions d'aujourd'hui : ${ajust.minutes} minutes disponibles, énergie ${ajust.energie}, matériel disponible : ${ajust.materiel.join(", ") || "aucun"}${ajust.douleur ? `, douleur ou gêne : ${ajust.douleur}` : ""}.
+${actuelle ? `SÉANCE ACTUELLE (déjà construite et ajustée pour lui, à MODIFIER, pas à refaire) :
+${JSON.stringify(actuelle.seance)}
+Demandes déjà appliquées à cette séance, qui restent valables : ${actuelle.demandes.length ? actuelle.demandes.map((d) => `« ${d} »`).join(", ") : "aucune"}.
+NOUVELLE DEMANDE : ${ajust.demande ? `« ${ajust.demande} »` : "aucune (seules les conditions ont pu changer)"}.
+Applique UNIQUEMENT la nouvelle demande (et les conditions si elles ont changé) à la séance actuelle : garde à l'identique les exercices, séries, cibles, charges et repos qu'elle ne touche pas, et respecte toujours les demandes déjà appliquées. Si l'ajout dépasse le temps disponible, réduis d'abord les repos puis une série de fin de liste, jamais un exercice issu d'une demande. "ajustement" dit en une phrase ce qui a changé.
+Réponds avec la séance COMPLÈTE modifiée.` : `${ajust.demande ? `Demande : « ${ajust.demande} ».
+` : ""}Prépare la SÉANCE DU JOUR : suis le programme (focus prévu pour ce jour si possible), applique la surcharge progressive à partir des séances précédentes (séries réussies → on monte ; échouées ou effort ≥ 9 → on consolide), tiens dans le temps disponible repos compris, n'utilise que le matériel disponible, évite toute sollicitation de la zone douloureuse. Énergie basse : volume réduit mais séance faite.`}
 Pour chaque exercice : "type" = "reps" (cible = répétitions) ou "duree" (cible = secondes) ; "charge" = poids ou variante précise si utile ; "repos" en secondes ; "consigne" = un point technique clé ; "alternative" = variante plus facile.
 Réponds uniquement en JSON : {"titre": string, "focus": string, "duree": number (minutes), "pourquoi": string (2 phrases qui citent ses chiffres), "echauffement": string, "exos": [{"nom": string, "type": "reps"|"duree", "series": number, "cible": number, "charge": string, "repos": number, "consigne": string, "alternative": string}], "retourAuCalme": string, "ajustement": string (ce que tu as adapté aujourd'hui et pourquoi)}`;
 

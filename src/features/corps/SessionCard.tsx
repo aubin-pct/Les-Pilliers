@@ -3,7 +3,7 @@
  * relire, faire (chrono + saisie série par série + repos), finir (ressenti) → historique qui nourrit la séance suivante.
  */
 import { useEffect, useState } from "react";
-import { genSeance } from "@/ai/contremaitre";
+import { prepareSeance } from "@/ai/ops";
 import { EQUIPMENT } from "@/content/profile";
 import { gain } from "@/engine/core";
 import { fallbackSeance } from "@/engine/fallbacks";
@@ -65,36 +65,44 @@ export function SessionCard({ c, now }: { c: Chantier; now: number }) {
 function Prepare({ c, now, onDone, canCancel }: { c: Chantier; now: number; onDone: () => void; canCancel: boolean }) {
   const act = useStore((s) => s.act);
   const prof = c.profile?.corps;
-  const [minutes, setMinutes] = useState(prof?.minutes ?? 40);
-  const [energie, setEnergie] = useState("normale");
-  const [materiel, setMateriel] = useState<string[]>(prof?.materiel ?? ["Aucun matériel"]);
-  const [douleur, setDouleur] = useState("");
+  // Modifier une séance existante : on repart de ses conditions, et seule la nouvelle demande s'ajoute.
+  const cur = c.plans.seance?.date === dayKey(now) ? c.plans.seance : null;
+  const prev = cur?.conditions;
+  const [minutes, setMinutes] = useState(prev?.minutes ?? prof?.minutes ?? 40);
+  const [energie, setEnergie] = useState(prev?.energie ?? "normale");
+  const [materiel, setMateriel] = useState<string[]>(prev?.materiel ?? prof?.materiel ?? ["Aucun matériel"]);
+  const [douleur, setDouleur] = useState(prev?.douleur ?? "");
   const [demande, setDemande] = useState("");
   const [busy, setBusy] = useState(false);
   const durations = [...new Set([15, 30, 45, 60, 90, prof?.minutes ?? 40])].sort((a, b) => a - b).map((m) => ({ id: m, label: `${m}` }));
   const day = c.plans.programme?.semaine.find((s) => s.jour.toLowerCase() === new Date(now).toLocaleDateString("fr-FR", { weekday: "long" }));
 
-  const go = async () => {
+  const go = async (neuf = false) => {
     setBusy(true);
-    const r = await genSeance({ minutes, energie, materiel, douleur: douleur.trim(), demande: demande.trim() });
+    const r = await prepareSeance({ minutes, energie, materiel, douleur: douleur.trim(), demande: demande.trim(), neuf });
     setBusy(false);
-    if (r) { act((d) => { d.plans.seance = { date: dayKey(Date.now()), ...r }; }); onDone(); }
+    if (r) { if (cur && !neuf) toast(r); onDone(); }
   };
+  const ask = <label className="f" htmlFor="sp-ask">{cur ? "Ce qu'il faut changer" : "Envie, contrainte"}<input id="sp-ask" type="text" value={demande} onChange={(e) => setDemande(e.target.value)} placeholder={cur ? "Ex. : ajoute 10 min de cardio à la fin" : "Ex. : hôtel, pas de bruit"} /></label>;
   return (
-    <Card title="Séance du jour" aside="à préparer">
-      {day && <p className="planned"><span className="eyebrow">Prévu</span><b>{day.focus}</b></p>}
+    <Card title="Séance du jour" aside={cur ? "modifier" : "à préparer"}>
+      {cur ? <p className="planned"><span className="eyebrow">Actuelle</span><b>{cur.titre} · {cur.exos.length} exercices</b></p>
+        : day && <p className="planned"><span className="eyebrow">Prévu</span><b>{day.focus}</b></p>}
+      {cur && ask}
+      {cur && (cur.demandes?.length ?? 0) > 0 && <div className="chips">{cur.demandes!.map((d) => <span key={d} className="chip on">✓ {d}</span>)}</div>}
       <Segmented label="Minutes" value={minutes} options={durations} onChange={setMinutes} />
       <Segmented label="Énergie" value={energie} options={ENERGY} onChange={setEnergie} />
-      <Fold title="Matériel, douleur, envie">
+      <Fold title={cur ? "Matériel, douleur" : "Matériel, douleur, envie"}>
         <Chips options={EQUIPMENT.slice(0, 7)} value={materiel} onChange={setMateriel} allowCustom />
         <label className="f" htmlFor="sp-pain">Douleur<input id="sp-pain" type="text" value={douleur} onChange={(e) => setDouleur(e.target.value)} placeholder="Ex. : épaule gauche" /></label>
-        <label className="f" htmlFor="sp-ask">Envie, contrainte<input id="sp-ask" type="text" value={demande} onChange={(e) => setDemande(e.target.value)} placeholder="Ex. : hôtel, pas de bruit" /></label>
+        {!cur && ask}
       </Fold>
       <div className="btn-row">
-        <button className="btn primary" type="button" disabled={busy} onClick={() => void go()}>Construire ma séance</button>
+        <button className="btn primary" type="button" disabled={busy} onClick={() => void go()}>{cur ? "Modifier ma séance" : "Construire ma séance"}</button>
         {canCancel && <button className="btn ghost" type="button" onClick={onDone}>Annuler</button>}
       </div>
-      {busy && <Thinking>Il construit ta séance</Thinking>}
+      {busy && <Thinking>{cur ? "Il modifie ta séance" : "Il construit ta séance"}</Thinking>}
+      {!busy && cur && <button className="linkish small" type="button" onClick={() => void go(true)}>Repartir de zéro</button>}
       {!busy && <button className="linkish small" type="button" onClick={() => { act((d) => { d.plans.seance = fallbackSeance(d, Date.now()); }); onDone(); }}>Séance de secours, sans IA</button>}
     </Card>
   );

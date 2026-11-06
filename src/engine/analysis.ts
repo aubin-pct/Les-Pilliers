@@ -116,5 +116,23 @@ export function mergeRecognized(parts: string[]): string {
     }
     out.push(t);
   }
-  return out.join(" ").replace(/\s+/g, " ").trim();
+  return collapseRepeats(out.join(" "));
+}
+
+/** Supprime une suite de mots répétée immédiatement (« je veux je veux parler » → « je veux parler »). Un mot seul répété (« non, non ») est gardé. */
+export function collapseRepeats(text: string): string {
+  const w = text.replace(/\s+/g, " ").trim().split(" ");
+  const k = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+  let changed = true;
+  while (changed) {
+    changed = false;
+    outer: for (let n = Math.floor(w.length / 2); n >= 2; n--) {
+      for (let i = 0; i + 2 * n <= w.length; i++) {
+        let same = true;
+        for (let j = 0; j < n && same; j++) same = k(w[i + j]) === k(w[i + n + j]);
+        if (same) { w.splice(i + n, n); changed = true; break outer; }
+      }
+    }
+  }
+  return w.join(" ").trim();
 }

@@ -68,7 +68,12 @@ export interface SeancePlan {
   echauffement: string; exos: Exo[]; retourAuCalme: string; ajustement: string;
   /** Saisie en cours, série par série (persistée : survit à une fermeture de l'appli). */
   faits?: (number | null)[][];
+  /** Conditions données à la préparation (reprises quand on la modifie). */
+  conditions?: SeanceConditions;
+  /** Demandes déjà appliquées à cette séance, dans l'ordre. */
+  demandes?: string[];
 }
+export interface SeanceConditions { minutes: number; energie: string; materiel: string[]; douleur: string }
 export interface Programme { ts: number; titre: string; logique: string; semaine: { jour: string; focus: string }[]; progression: string }
 
 export interface Palier { titre: string; pourquoi: string; preuve: string; cash: boolean; jours: number }

@@ -19,16 +19,26 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 export { weekKey };
 
 /* ---------------- Corps ---------------- */
-export async function prepareSeance(a: Partial<{ minutes: number; energie: string; materiel: string[]; douleur: string; demande: string }> = {}) {
+/**
+ * Prépare la séance du jour, ou MODIFIE celle qui existe déjà : la séance actuelle et les demandes déjà
+ * appliquées partent avec la consigne, seule la nouvelle demande s'ajoute. `neuf` repart de zéro.
+ */
+export async function prepareSeance(a: Partial<{ minutes: number; energie: string; materiel: string[]; douleur: string; demande: string; neuf: boolean }> = {}) {
   const c = get();
   if (c.seanceStart !== null) return "Une séance est en cours : termine-la d'abord.";
-  const r = await C.genSeance({
-    minutes: a.minutes ?? c.profile?.corps.minutes ?? 40, energie: a.energie ?? "normale",
-    materiel: a.materiel ?? c.profile?.corps.materiel ?? [], douleur: a.douleur ?? "", demande: a.demande ?? "",
-  });
+  const cur = c.plans.seance?.date === dayKey(Date.now()) && !a.neuf ? c.plans.seance : null;
+  const prev = cur?.conditions;
+  const cond = {
+    minutes: a.minutes ?? prev?.minutes ?? c.profile?.corps.minutes ?? 40, energie: a.energie || prev?.energie || "normale",
+    materiel: a.materiel ?? prev?.materiel ?? c.profile?.corps.materiel ?? [], douleur: a.douleur ?? prev?.douleur ?? "",
+  };
+  const demande = (a.demande ?? "").trim();
+  const demandes = cur?.demandes ?? [];
+  const actuelle = cur ? { seance: { titre: cur.titre, focus: cur.focus, duree: cur.duree, echauffement: cur.echauffement, exos: cur.exos, retourAuCalme: cur.retourAuCalme }, demandes } : undefined;
+  const r = await C.genSeance({ ...cond, demande }, actuelle);
   if (!r) return null;
-  act((d) => { d.plans.seance = { date: dayKey(Date.now()), ...r }; });
-  return `Séance prête : ${r.titre}, ${r.duree} min.`;
+  act((d) => { d.plans.seance = { date: dayKey(Date.now()), ...r, conditions: cond, demandes: demande ? [...demandes, demande].slice(-8) : demandes }; });
+  return cur ? `Séance modifiée : ${r.ajustement || r.titre}` : `Séance prête : ${r.titre}, ${r.duree} min.`;
 }
 export async function remakeProgramme(demande = "") {
   const r = await C.genProgramme(demande);

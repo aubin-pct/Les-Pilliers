@@ -43,6 +43,11 @@ export function corpsContext(c: Chantier, now: number) {
       detail: s.logs?.map((l) => `${l.exo} : ${l.faits.map((x) => x ?? "×").join("/")} (cible ${l.cible}${l.type === "duree" ? " s" : ""}${l.charge ? ", " + l.charge : ""})`),
     })),
     seances_7_derniers_jours: c.seances.filter((s) => s.ts > now - 7 * DAY).length,
+    seance_du_jour: c.plans.seance?.date === dayKey(now) ? {
+      titre: c.plans.seance.titre, minutes: c.plans.seance.duree, commencee: c.seanceStart !== null,
+      exercices: c.plans.seance.exos.map((e) => `${e.nom} ${e.series}×${e.cible}${e.type === "duree" ? " s" : ""}${e.charge ? " " + e.charge : ""}`),
+      demandes_appliquees: c.plans.seance.demandes ?? [],
+    } : null,
     programme: c.plans.programme && { titre: c.plans.programme.titre, semaine: c.plans.programme.semaine, progression: c.plans.programme.progression },
     memoire_du_contremaitre: memory(c, "corps"),
     jour: new Date(now).toLocaleDateString("fr-FR", { weekday: "long" }),

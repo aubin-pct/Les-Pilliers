@@ -101,5 +101,8 @@ describe("reconnaissance vocale", () => {
     expect(mergeRecognized(["Bonjour.", "bonjour", "je m'appelle Aubin"])).toBe("Bonjour. je m'appelle Aubin");
     expect(mergeRecognized(["première phrase", "deuxième phrase"])).toBe("première phrase deuxième phrase");
     expect(mergeRecognized(["", "  ", "texte"])).toBe("texte");
+    expect(mergeRecognized(["je veux je veux parler du projet du projet"])).toBe("je veux parler du projet");
+    expect(mergeRecognized(["non non c'est faux"])).toBe("non non c'est faux");
+    expect(mergeRecognized(["je veux parler", "je veux parler du projet je veux parler du projet"])).toBe("je veux parler du projet");
   });
 });

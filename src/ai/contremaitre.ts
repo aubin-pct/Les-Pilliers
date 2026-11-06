@@ -48,7 +48,7 @@ const now = () => Date.now();
 
 /* ---------------- Corps ---------------- */
 export const genProgramme = (demande = "") => ask(P.programmePrompt(corpsContext(chantier()!, now()), demande), S.ProgrammeSchema, { deep: true, max: 1500 });
-export const genSeance = (ajust: Parameters<typeof P.seancePrompt>[1]) => ask(P.seancePrompt(corpsContext(chantier()!, now()), ajust), S.SeanceSchema, { max: 2200 });
+export const genSeance = (ajust: Parameters<typeof P.seancePrompt>[1], actuelle?: Parameters<typeof P.seancePrompt>[2]) => ask(P.seancePrompt(corpsContext(chantier()!, now()), ajust, actuelle), S.SeanceSchema, { max: 2400 });
 
 /* ---------------- Capital ---------------- */
 export const genRoadmap = (demande = "") => ask(P.roadmapPrompt(capitalContext(chantier()!, now()), demande), S.RoadmapSchema, { deep: true, max: 2500 });

@@ -12,6 +12,7 @@ import { toast } from "@/store/ui";
 import { Card, Foreman, Sheet, Thinking } from "@/ui/kit";
 import { HoldButton } from "@/ui/HoldButton";
 import { SyncCard } from "./SyncCard";
+import { MicTest } from "./MicTest";
 
 export function ReglagesView() {
   const settings = useSettings();
@@ -84,6 +85,7 @@ export function ReglagesView() {
         </div>
         <p className="muted small">Micro : ta voix est enregistrée, les blancs mesurés, la transcription se fait en direct quand le navigateur le permet. Clavier : tu dictes avec le micro du clavier, sans enregistrement.</p>
       </Card>
+      <MicTest />
 
       {real && !demo && (
         <Card title="Sauvegarde" aside={settings.lastBackup ? `dernière : ${fdateK(settings.lastBackup)}` : "jamais"}>

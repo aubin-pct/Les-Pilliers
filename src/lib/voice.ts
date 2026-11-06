@@ -68,7 +68,7 @@ export class Recognizer {
   private active = false;
   private quick = 0;
   private t0 = 0;
-  constructor(private on: { text?: (final: string, interim: string) => void; fail?: (error: string) => void; end?: () => void } = {}) {}
+  constructor(private on: { text?: (final: string, interim: string) => void; fail?: (error: string) => void; end?: () => void; raw?: (line: string) => void } = {}) {}
 
   get text() { return [this.final, this.interim].filter(Boolean).join(" ").trim(); }
 
@@ -88,17 +88,20 @@ export class Recognizer {
         // qui répètent la phrase finale ; la fusion les absorbe.
         const all: string[] = [];
         for (let i = 0; i < e.results.length; i++) all.push(e.results[i][0].transcript);
+        this.on.raw?.(`résultat i=${e.resultIndex} [${Array.from({ length: e.results.length }, (_, i) => `${e.results[i].isFinal ? "F" : "p"}:${e.results[i][0].transcript}`).join(" | ")}]`);
         this.final = [this.committed, mergeRecognized(all)].filter(Boolean).join(" ");
         this.interim = "";
         this.recognized = true; this.quick = 0;
         this.on.text?.(this.final, this.interim);
       };
       r.onerror = (e) => {
+        this.on.raw?.(`erreur ${e.error}`);
         if (this.r !== r || !FATAL.includes(e.error)) return;
         this.failed = true; this.error = e.error; this.active = false;
         this.on.fail?.(e.error);
       };
       r.onend = () => {
+        this.on.raw?.("fin de session");
         if (this.r !== r) return;
         // Ce qui était encore provisoire à la coupure est gardé.
         this.committed = this.text; this.final = this.committed; this.interim = "";
@@ -108,6 +111,7 @@ export class Recognizer {
         this.session();
       };
       this.r = r; this.t0 = Date.now();
+      this.on.raw?.(`début de session (${ANDROID ? "Android, sessions courtes" : "continue"})`);
       r.start();
       return true;
     } catch { this.r = null; this.active = false; this.failed = true; this.on.fail?.("start"); return false; }
