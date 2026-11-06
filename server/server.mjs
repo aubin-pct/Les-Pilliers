@@ -53,7 +53,7 @@ export function createServer(opts = {}) {
     if (o && (ORIGINS.includes(o) || ORIGINS.includes("*"))) {
       res.setHeader("Access-Control-Allow-Origin", o);
       res.setHeader("Vary", "Origin");
-      res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+      res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Device");
       res.setHeader("Access-Control-Allow-Methods", "GET, PUT, OPTIONS");
       res.setHeader("Access-Control-Allow-Private-Network", "true");
       res.setHeader("Access-Control-Max-Age", "600");

@@ -60,6 +60,9 @@ describe("serveur de synchronisation", () => {
     const o = await fetch(`${base}/api/state`, { method: "OPTIONS", headers: { Origin: "https://aubin-pct.github.io", "Access-Control-Request-Method": "PUT" } });
     expect(o.status).toBe(204);
     expect(o.headers.get("access-control-allow-origin")).toBe("https://aubin-pct.github.io");
+    // Tous les en-têtes envoyés par l'appli doivent être autorisés, sinon le navigateur bloque la requête.
+    const allowed = o.headers.get("access-control-allow-headers").toLowerCase();
+    for (const h of ["authorization", "content-type", "x-device"]) expect(allowed).toContain(h);
     const x = await fetch(`${base}/api/health`, { headers: { Origin: "https://evil.example" } });
     expect(x.headers.get("access-control-allow-origin")).toBeNull();
     expect(await (await fetch(`${base}/corps`)).text()).toContain("Les Piliers");

@@ -44,17 +44,31 @@ export const syncConfigured = () => !!config();
 
 const device = () => (/iPhone|Android/i.test(navigator.userAgent) ? "téléphone" : "ordinateur");
 
+/** Distingue « Mac injoignable » de « Mac joint mais qui refuse cette adresse » (CORS). */
+async function whyUnreachable(url: string) {
+  try {
+    await fetch(url + "/api/health", { mode: "no-cors", cache: "no-store" });
+    return `Le Mac répond mais refuse cette adresse (${location.origin}). Mets-le à jour : git pull && docker compose up -d --build.`;
+  } catch {
+    return "Serveur injoignable. Tailscale est-il actif sur ce téléphone, et le Mac allumé ?";
+  }
+}
+
 async function api(path: string, init: RequestInit = {}, cfg = config()): Promise<Response> {
   if (!cfg) throw new Error("Synchronisation non configurée.");
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 20_000);
   try {
+    // Depuis une autre origine (GitHub Pages), seuls les en-têtes standard : un serveur pas encore mis à jour
+    // refuserait l'en-tête X-Device et le navigateur bloquerait toute la requête.
+    const same = new URL(cfg.url, location.href).origin === location.origin;
     return await fetch(cfg.url + path, {
       ...init, signal: ctl.signal, cache: "no-store",
-      headers: { Authorization: `Bearer ${cfg.token}`, "X-Device": device(), ...(init.headers ?? {}) },
+      headers: { Authorization: `Bearer ${cfg.token}`, ...(same ? { "X-Device": device() } : {}), ...(init.headers ?? {}) },
     });
   } catch (e) {
-    throw new Error((e as Error).name === "AbortError" ? "Le serveur ne répond pas." : "Serveur injoignable. Tailscale est-il actif sur cet appareil, et le Mac allumé ?");
+    if ((e as Error).name === "AbortError") throw new Error("Le serveur ne répond pas.");
+    throw new Error(await whyUnreachable(cfg.url));
   } finally { clearTimeout(t); }
 }
 
