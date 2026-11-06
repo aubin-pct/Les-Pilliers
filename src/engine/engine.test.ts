@@ -283,7 +283,7 @@ describe("validation des réponses de l'IA", () => {
     if (!r.success) return;
     expect(r.data.duree).toBe(45);
     expect(r.data.exos[0]).toMatchObject({ series: 4, cible: 13, charge: "", consigne: "" });
-    expect(r.data.exos[1]).toMatchObject({ type: "reps", series: 10 });
+    expect(r.data.exos[1]).toMatchObject({ type: "reps", series: 30 });
   });
   it("rejette une réponse incomplète", () => {
     expect(S.RoadmapSchema.safeParse({ vision: "x", paliers: [] }).success).toBe(false);
