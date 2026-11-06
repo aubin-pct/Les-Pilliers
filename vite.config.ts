@@ -18,6 +18,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icon-192.png", "icon-512.png"],
       manifest: {
+        // Identité propre et stable : une installation ratée ou ancienne (même origine) ne bloque plus la nouvelle.
+        id: "./?app=les-piliers",
         name: "Les Piliers",
         short_name: "Piliers",
         description: "Corps, Capital, Esprit, Verbe. Quatre piliers qui s'effritent chaque jour, un Contremaître qui démonte tes excuses.",
@@ -30,7 +32,8 @@ export default defineConfig({
         theme_color: "#101215",
         icons: [
           { src: "icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       workbox: {
