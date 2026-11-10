@@ -10,6 +10,7 @@ import { fallbackSeance } from "@/engine/fallbacks";
 import { POINTS, setsRatio } from "@/engine/scoring";
 import { HoldButton } from "@/ui/HoldButton";
 import { FocusSession } from "./FocusSession";
+import { SeeExo } from "./ExoViewer";
 import { addExo, addSet, faitsOf, fillExo, finishSession, parseKg, poidsOf, removeExo, removeSet, setPoids, setSet } from "./session";
 import type { Chantier, SeancePlan } from "@/engine/types";
 import { beep, buzz, keepAwake } from "@/lib/device";
@@ -125,7 +126,7 @@ function PlanView({ plan }: { plan: SeancePlan }) {
       </div>
       <div className="exo-list">
         {plan.exos.map((e, i) => (
-          <div className="exo-row" key={i}><span className="exo-n">{e.nom}</span><span className="exo-d num">{e.series}×{e.cible}{e.type === "duree" ? "s" : ""}</span></div>
+          <div className="exo-row" key={i}><SeeExo exo={e} /><span className="exo-n">{e.nom}</span><span className="exo-d num">{e.series}×{e.cible}{e.type === "duree" ? "s" : ""}</span></div>
         ))}
       </div>
       {plan.pourquoi && <Fold title="Pourquoi cette séance"><p className="voice">{plan.pourquoi}{plan.ajustement ? `\n${plan.ajustement}` : ""}</p><p className="small muted">Échauffement : {plan.echauffement}</p></Fold>}
@@ -169,7 +170,7 @@ function Run({ c, plan, now }: { c: Chantier; plan: SeancePlan; now: number }) {
       <div>
         {plan.exos.map((e, i) => (
           <div className="exo" key={i}>
-            <div className="exo-head"><b>{e.nom}</b><span className="meta">{faits[i].length} × {e.cible}{e.type === "duree" ? " s" : ""}{e.charge ? ` · ${e.charge}` : ""}</span></div>
+            <div className="exo-head"><b><SeeExo exo={e} /> {e.nom}</b><span className="meta">{faits[i].length} × {e.cible}{e.type === "duree" ? " s" : ""}{e.charge ? ` · ${e.charge}` : ""}</span></div>
             {e.consigne && <span className="muted small">{e.consigne}</span>}
             <div className="sets">
               <button className="btn small ghost" type="button" aria-label={`${e.nom} : retirer une série`} disabled={faits[i].length <= 1} onClick={() => removeSet(i)}>−</button>

@@ -18,6 +18,7 @@ import { VerbeView } from "@/features/verbe/VerbeView";
 import { ReglagesView } from "@/features/reglages/ReglagesView";
 import { Onboarding } from "@/features/profil/Onboarding";
 import { ProfilView } from "@/features/profil/ProfilView";
+import { AnatomyLab } from "@/features/corps/AnatomyLab";
 import { CoachFab, CoachPanel } from "@/features/coach/CoachPanel";
 import { useDailyBrief } from "@/features/coach/CoachHead";
 import { useAutoMemory } from "@/features/temple/Memory";
@@ -139,9 +140,9 @@ export function App() {
   const demo = useIsDemo();
   const nav = useNavigate();
   const loc = useLocation();
-  useEffect(() => { if (!c && loc.pathname !== "/reglages" && loc.pathname !== "/") nav("/", { replace: true }); }, [c, loc.pathname, nav]);
+  useEffect(() => { if (!c && loc.pathname !== "/reglages" && loc.pathname !== "/" && !(import.meta.env.DEV && loc.pathname === "/anatomie")) nav("/", { replace: true }); }, [c, loc.pathname, nav]);
   // Profil absent ou accueil inachevé : on passe d'abord par l'accueil (sauf réglages).
-  const onboarding = !!c && !demo && (!c.profile || c.profile.updated === 0) && loc.pathname !== "/reglages";
+  const onboarding = !!c && !demo && (!c.profile || c.profile.updated === 0) && loc.pathname !== "/reglages" && loc.pathname !== "/anatomie";
   if (onboarding) {
     return (
       <>
@@ -160,6 +161,7 @@ export function App() {
           <div className="route" key={loc.pathname}>
           <Routes location={loc}>
             <Route path="/reglages" element={<ReglagesView />} />
+            {import.meta.env.DEV && <Route path="/anatomie" element={<AnatomyLab />} />}
             {c ? (
               <>
                 <Route path="/" element={<TempleView />} />

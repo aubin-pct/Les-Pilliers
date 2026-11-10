@@ -1,4 +1,5 @@
 import type { TestId } from "@/content/corps";
+import type { MovementId, MuscleId } from "@/content/anatomy";
 
 export type PillarId = "corps" | "capital" | "esprit" | "verbe";
 export type { TestId };
@@ -62,6 +63,10 @@ export interface Profile {
 export interface Exo {
   nom: string; type: "reps" | "duree"; series: number; cible: number;
   charge: string; repos: number; consigne: string; alternative: string;
+  /** Mouvement de l'écorché 3D (`content/anatomy.ts`), choisi par l'IA ; sinon déduit du nom. */
+  mouvement?: MovementId;
+  /** Muscles désignés par l'IA (identifiants du catalogue). */
+  muscles?: { principaux: MuscleId[]; secondaires: MuscleId[] };
 }
 export interface SeancePlan {
   date: string; titre: string; focus: string; duree: number; pourquoi: string;

@@ -1039,3 +1039,48 @@ button.fs { cursor: pointer; }
 .done-seance:last-of-type { border-bottom: 0; }
 .add-exo { display: grid; gap: 10px; padding: 12px; border: 1px dashed var(--line); border-radius: var(--r); }
 .add-exo-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+
+/* ---------- Écorché 3D (features/corps/ExoViewer.tsx) ---------- */
+.see-exo { flex: none; display: inline-grid; grid-auto-flow: column; align-items: center; gap: 6px; width: 30px; height: 30px; padding: 0; justify-content: center; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--c-corps) 45%, var(--line)); background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--c-corps) 18%, var(--panel-2)), var(--panel)); color: var(--c-corps); vertical-align: middle; }
+.see-exo.big { width: auto; height: 40px; padding: 0 14px; border-radius: 999px; justify-self: start; font-size: 13px; font-weight: 600; }
+.exo-row { align-items: center; }
+.exo-row .exo-n { flex: 1; }
+.anat { position: fixed; inset: 0; z-index: 58; display: grid; grid-template-rows: auto minmax(300px, 58vh) 1fr; background: radial-gradient(120% 70% at 50% 18%, #1c1a1a, var(--bg) 70%); color: var(--fg); overflow: hidden; animation: cp-in .3s var(--ease) both;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); }
+.anat-top { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px; padding: 10px 16px 6px; max-width: 760px; width: 100%; margin: 0 auto; }
+.anat-title { display: grid; min-width: 0; }
+.anat-title b { font-family: var(--f-display); font-weight: 900; font-size: 26px; line-height: 1; text-transform: uppercase; color: var(--stone); overflow-wrap: anywhere; text-shadow: 0 2px 0 rgba(0, 0, 0, .7); }
+.anat-dose { font-family: var(--f-mono); color: var(--c-corps); font-weight: 600; }
+.anat-stage { position: relative; min-height: 0; }
+.anat-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+.anat-canvas:active { cursor: grabbing; }
+.anat-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-family: var(--f-mono); font-size: 13px; pointer-events: none; padding: 16px; text-align: center; }
+.anat-tools, .anat-views { position: absolute; display: flex; gap: 6px; }
+.anat-tools { top: 8px; right: 16px; }
+.anat-views { bottom: 10px; left: 16px; }
+.anat-tools button, .anat-views button { min-width: 40px; height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(16, 18, 21, .72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: var(--fg); font-family: var(--f-mono); font-size: 12px; }
+.anat-tools button[aria-pressed="true"], .anat-views button[aria-pressed="true"] { border-color: var(--c-corps); color: var(--c-corps); }
+.anat-legend { position: absolute; right: 16px; bottom: 14px; display: flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+.anat-legend i { width: 74px; height: 6px; border-radius: 6px; background: linear-gradient(90deg, rgb(126, 59, 52), rgb(128, 26, 23) 30%, rgb(204, 41, 26) 60%, rgb(250, 107, 31) 85%, rgb(255, 204, 107)); }
+.anat-panel { overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 14px; align-content: start; padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 24px); max-width: 560px; width: 100%; margin: 0 auto; border-top: 1px solid var(--line); background: linear-gradient(var(--panel), var(--bg)); }
+.anat-hint { text-align: center; margin: 0; }
+.anat-info { display: grid; gap: 8px; padding: 12px; border-radius: var(--rr); border: 1px solid color-mix(in srgb, var(--c-corps) 40%, var(--line)); background: var(--panel-2); animation: rise .25s var(--ease) both; }
+.anat-info p { margin: 0; }
+.anat-info-h { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.anat-info-h > div { display: grid; min-width: 0; }
+.anat-info-h b { font-size: 17px; }
+.focus-x.small { width: 32px; height: 32px; font-size: 13px; }
+.anat-role { font-family: var(--f-mono); font-size: 12px; color: var(--c-corps); }
+.anat-meter, .anat-bar { height: 6px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.anat-meter span, .anat-bar span { display: block; height: 100%; border-radius: 6px; }
+.anat-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgba(0, 0, 0, .4), 0 0 10px currentColor; }
+.anat-list { display: grid; gap: 2px; }
+.anat-list .eyebrow { margin-bottom: 4px; }
+.anat-row { display: grid; grid-template-columns: auto 1fr 70px 26px; gap: 10px; align-items: center; padding: 8px 6px; border: 0; border-radius: var(--r); background: none; text-align: left; }
+.anat-row[aria-pressed="true"] { background: color-mix(in srgb, var(--c-corps) 14%, transparent); }
+.anat-row-n { min-width: 0; overflow-wrap: anywhere; }
+.anat-pc { font-family: var(--f-mono); font-size: 12px; color: var(--muted); text-align: right; }
+.anat-cues { display: grid; gap: 10px; }
+.anat-cues p { margin: 0; display: grid; gap: 2px; }
+@media (min-width: 900px) { .anat { grid-template-rows: auto 1fr; grid-template-columns: 1fr 400px; } .anat-top { grid-column: 1 / -1; } .anat-panel { border-top: 0; border-left: 1px solid var(--line); } }
+@media (prefers-reduced-motion: reduce) { .anat, .anat-info { animation: none; } }

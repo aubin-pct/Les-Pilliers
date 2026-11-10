@@ -5,6 +5,11 @@
  * sécurité physique (blessures, douleurs) prioritaire sur la dureté.
  */
 
+import { MOVEMENTS, MUSCLES } from "@/content/anatomy";
+
+/** Vocabulaire de l'écorché 3D : l'IA doit choisir dans ces listes pour que l'exercice soit animé et ses muscles allumés. */
+const ANATOMIE = `Pour l'écorché animé de chaque exercice : "mouvement" = l'identifiant le plus proche parmi ${MOVEMENTS.map((m) => m.id).join(", ")} ; "muscles" = {"principaux": [1 à 3 identifiants], "secondaires": [0 à 4]} parmi ${MUSCLES.map((m) => m.id).join(", ")}. Uniquement ces identifiants, exacts.`;
+
 export const PERSONA = `Tu es LE CONTREMAÎTRE de l'application « Les Piliers » : un coach de discipline dans le style de David Goggins, et un expert de chaque domaine (entraînement physique, entrepreneuriat, culture générale, éloquence). Ton ton : dur, sec, direct, tutoiement, phrases courtes, en français. Tu démontes les excuses et les comportements, jamais la personne : aucune insulte, aucune remarque sur le physique, l'apparence ou la valeur de quelqu'un. Si la personne évoque une maladie, une blessure, un deuil, une urgence ou une souffrance psychologique, tu deviens bref et respectueux et tu l'invites à prendre soin d'elle et à en parler à quelqu'un si c'est lourd. Tout ce que tu proposes est personnalisé : tu t'appuies sur le dossier fourni (profil, historique, ta mémoire), jamais sur des généralités, et tu n'inventes aucun chiffre. Tu réponds toujours dans le format demandé.`;
 
 const j = (o: unknown) => JSON.stringify(o);
@@ -29,7 +34,8 @@ Applique UNIQUEMENT la nouvelle demande (et les conditions si elles ont changé)
 Aucun plafond d'exercices ni de séries : s'il demande d'ajouter, ajoute. Réponds avec la séance COMPLÈTE modifiée.` : `${ajust.demande ? `Demande : « ${ajust.demande} ».
 ` : ""}Prépare la SÉANCE DU JOUR : suis le programme (focus prévu pour ce jour si possible), applique la surcharge progressive à partir des séances précédentes (séries réussies → on monte ; échouées ou effort ≥ 9 → on consolide), tiens dans le temps disponible repos compris, n'utilise que le matériel disponible, évite toute sollicitation de la zone douloureuse. Énergie basse : volume réduit mais séance faite.`}
 Pour chaque exercice : "type" = "reps" (cible = répétitions) ou "duree" (cible = secondes) ; "charge" = poids ou variante précise si utile ; "repos" en secondes ; "consigne" = un point technique clé ; "alternative" = variante plus facile.
-Réponds uniquement en JSON : {"titre": string, "focus": string, "duree": number (minutes), "pourquoi": string (2 phrases qui citent ses chiffres), "echauffement": string, "exos": [{"nom": string, "type": "reps"|"duree", "series": number, "cible": number, "charge": string, "repos": number, "consigne": string, "alternative": string}], "retourAuCalme": string, "ajustement": string (ce que tu as adapté aujourd'hui et pourquoi)}`;
+${ANATOMIE}
+Réponds uniquement en JSON : {"titre": string, "focus": string, "duree": number (minutes), "pourquoi": string (2 phrases qui citent ses chiffres), "echauffement": string, "exos": [{"nom": string, "type": "reps"|"duree", "series": number, "cible": number, "charge": string, "repos": number, "consigne": string, "alternative": string, "mouvement": string, "muscles": {"principaux": [string], "secondaires": [string]}}], "retourAuCalme": string, "ajustement": string (ce que tu as adapté aujourd'hui et pourquoi)}`;
 
 /* ---------------- Capital ---------------- */
 

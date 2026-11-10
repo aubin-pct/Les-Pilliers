@@ -3,6 +3,7 @@
  * nombres convertis, textes coupés, listes bornées, valeurs par défaut. Une réponse invalide est rejetée.
  */
 import { z } from "zod";
+import { isMovementId, isMuscleId } from "@/content/anatomy";
 
 const str = (v: unknown) => (v === null || v === undefined ? v : typeof v === "object" ? JSON.stringify(v) : String(v));
 /**
@@ -38,6 +39,17 @@ export const ExoSchema = z.object({
   repos: int(0, 600, 60),
   consigne: opt(240),
   alternative: opt(120),
+  /** Mouvement animé dans l'écorché (identifiant du catalogue) ; invalide → déduit du nom à l'affichage. */
+  mouvement: z.preprocess((v) => (typeof v === "string" ? v.trim().toLowerCase() : ""), z.string()).catch("").transform((v) => (isMovementId(v) ? v : undefined)),
+  muscles: z.object({
+    principaux: z.array(z.unknown()).catch([]).default([]),
+    secondaires: z.array(z.unknown()).catch([]).default([]),
+  }).catch({ principaux: [], secondaires: [] }).default({ principaux: [], secondaires: [] }).transform((m) => {
+    const ids = (a: unknown[]) => [...new Set(a.map((x) => String(x).trim().toLowerCase()).filter(isMuscleId))].slice(0, 6);
+    const principaux = ids(m.principaux);
+    const secondaires = ids(m.secondaires).filter((x) => !principaux.includes(x));
+    return principaux.length ? { principaux, secondaires } : undefined;
+  }),
 });
 export const SeanceSchema = z.object({
   titre: txt(60), focus: txt(120), duree: int(5, 600, 40), pourquoi: txt(400),
