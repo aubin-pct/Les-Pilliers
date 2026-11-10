@@ -10,7 +10,15 @@ describe("écorché : mouvement d'un exercice", () => {
   });
   it("le mot-clé le plus précis l'emporte", () => {
     expect(guessMovement("Squats sautés")).toBe("squat_saute");
-    expect(guessMovement("Squat goblet")).toBe("squat");
+    expect(guessMovement("Squat goblet")).toBe("squat_goblet");
+    expect(guessMovement("Squats")).toBe("squat");
+    expect(guessMovement("Squat sumo")).toBe("squat_sumo");
+    expect(guessMovement("Squat bulgare")).toBe("squat_bulgare");
+    expect(guessMovement("Fentes bulgares")).toBe("squat_bulgare");
+    expect(guessMovement("Pistol squat assisté")).toBe("squat_pistol");
+    expect(guessMovement("Dips aux barres parallèles")).toBe("dips_barres");
+    expect(guessMovement("Dips buste penché")).toBe("dips_pectoraux");
+    expect(guessMovement("Dips")).toBe("dips");
     expect(guessMovement("Gainage latéral")).toBe("gainage_lateral");
     expect(guessMovement("Dips sur chaise")).toBe("dips");
     expect(guessMovement("Pompes diamant")).toBe("pompe_diamant");

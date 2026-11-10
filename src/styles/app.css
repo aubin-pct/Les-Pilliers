@@ -1045,7 +1045,7 @@ button.fs { cursor: pointer; }
 .see-exo.big { width: auto; height: 40px; padding: 0 14px; border-radius: 999px; justify-self: start; font-size: 13px; font-weight: 600; }
 .exo-row { align-items: center; }
 .exo-row .exo-n { flex: 1; }
-.anat { position: fixed; inset: 0; z-index: 58; display: grid; grid-template-rows: auto minmax(300px, 58vh) 1fr; background: radial-gradient(120% 70% at 50% 18%, #1c1a1a, var(--bg) 70%); color: var(--fg); overflow: hidden; animation: cp-in .3s var(--ease) both;
+.anat { position: fixed; inset: 0; z-index: 58; display: grid; grid-template-rows: auto minmax(260px, 52vh) auto 1fr; background: radial-gradient(120% 70% at 50% 18%, #1c1a1a, var(--bg) 70%); color: var(--fg); overflow: hidden; animation: cp-in .3s var(--ease) both;
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); }
 .anat-top { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px; padding: 10px 16px 6px; max-width: 760px; width: 100%; margin: 0 auto; }
 .anat-title { display: grid; min-width: 0; }
@@ -1060,7 +1060,6 @@ button.fs { cursor: pointer; }
 .anat-views { bottom: 10px; left: 16px; }
 .anat-tools button, .anat-views button { min-width: 40px; height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(16, 18, 21, .72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: var(--fg); font-family: var(--f-mono); font-size: 12px; }
 .anat-tools button[aria-pressed="true"], .anat-views button[aria-pressed="true"] { border-color: var(--c-corps); color: var(--c-corps); }
-.anat-legend { position: absolute; right: 16px; bottom: 14px; display: flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
 .anat-legend i { width: 74px; height: 6px; border-radius: 6px; background: linear-gradient(90deg, rgb(56, 158, 77), rgb(230, 204, 46) 42%, rgb(247, 122, 31) 70%, rgb(224, 26, 20)); }
 .anat-panel { overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 14px; align-content: start; padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 24px); max-width: 560px; width: 100%; margin: 0 auto; border-top: 1px solid var(--line); background: linear-gradient(var(--panel), var(--bg)); }
 .anat-hint { text-align: center; margin: 0; }
@@ -1082,7 +1081,7 @@ button.fs { cursor: pointer; }
 .anat-pc { font-family: var(--f-mono); font-size: 12px; color: var(--muted); text-align: right; }
 .anat-cues { display: grid; gap: 10px; }
 .anat-cues p { margin: 0; display: grid; gap: 2px; }
-@media (min-width: 900px) { .anat { grid-template-rows: auto 1fr; grid-template-columns: 1fr 400px; } .anat-top { grid-column: 1 / -1; } .anat-panel { border-top: 0; border-left: 1px solid var(--line); } }
+@media (min-width: 900px) { .anat { grid-template-rows: auto auto 1fr; grid-template-columns: 1fr 420px; } .anat-top { grid-column: 1 / -1; } .anat-stage { grid-row: 2 / 4; } .anat-tabs, .anat-panel { grid-column: 2; border-left: 1px solid var(--line); } .anat-panel { border-top: 0; } }
 @media (prefers-reduced-motion: reduce) { .anat, .anat-info { animation: none; } }
 .exo-row-btn { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; }
 .exo-row-btn:last-child { border-bottom: 0; }
@@ -1093,3 +1092,32 @@ button.fs { cursor: pointer; }
 .anat-vgroup { display: grid; gap: 6px; }
 .anat-vtype { font-size: 12px; font-weight: 600; color: var(--stone-dark); }
 .anat-variants .chip[aria-pressed="true"] { border-color: var(--c-corps); color: var(--c-corps); background: color-mix(in srgb, var(--c-corps) 14%, transparent); }
+
+/* Écorché : outils, effort en direct, onglets, fiches dépliées */
+.anat-tools button[aria-label="Recentrer la vue"] { font-size: 16px; }
+.anat-live { position: absolute; right: 16px; bottom: 14px; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(16, 18, 21, .72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); font-family: var(--f-mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.anat-live i { width: 56px; height: 6px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.anat-live i b { display: block; height: 100%; border-radius: 6px; transition: width .1s linear; }
+.anat-live .num { width: 22px; text-align: right; color: var(--fg); }
+.anat-cycle { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(255, 255, 255, .05); }
+.anat-cycle b { display: block; height: 100%; background: color-mix(in srgb, var(--c-corps) 70%, transparent); }
+.anat-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 6px 16px 0; border-top: 1px solid var(--line); background: var(--panel); max-width: 560px; width: 100%; margin: 0 auto; }
+.anat-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font-weight: 600; font-size: 14px; }
+.anat-tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--c-corps); }
+.anat-tabs .num { font-size: 11px; padding: 1px 6px; border-radius: 99px; background: var(--line); color: var(--fg); }
+.anat-panel { border-top: 0; }
+.anat-panel .anat-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-family: var(--f-mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.anat-panel .anat-legend .muted { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 12px; }
+.anat-item { border-radius: var(--r); }
+.anat-item.open { background: color-mix(in srgb, var(--c-corps) 10%, var(--panel-2)); border: 1px solid color-mix(in srgb, var(--c-corps) 35%, var(--line)); }
+.anat-item.open .anat-row { background: none; }
+.anat-detail { display: grid; gap: 6px; padding: 0 10px 12px 34px; animation: rise .2s var(--ease) both; }
+.anat-detail p { margin: 0; }
+.anat-variants { border: 0; padding: 0; background: none; }
+.anat-dosegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 8px; }
+.anat-dosegrid div { display: grid; padding: 10px; border-radius: var(--r); border: 1px solid var(--line); background: var(--panel-2); }
+.anat-dosegrid b { font-size: 20px; color: var(--c-corps); overflow-wrap: anywhere; }
+.anat-dosegrid span { font-size: 12px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .anat-detail { animation: none; } .anat-live i b { transition: none; } }
+.anat-vbar { display: flex; flex-wrap: wrap; gap: 8px; position: sticky; top: -14px; z-index: 1; padding: 10px 0; margin-top: -10px; background: var(--panel); }
+.anat-variants > p { margin: 0; }

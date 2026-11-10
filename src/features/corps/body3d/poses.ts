@@ -7,7 +7,7 @@ import type { MovementId } from "@/content/anatomy";
 import { blendPose, bodyPoint, mirror, mirrorX, placeRoot, type Joint, type Limb, type Plant, type Pose, type V3 } from "./rig";
 
 /** Accessoire nommé, ou bloc posé au sol (centre x, y, z ; largeur, hauteur, profondeur). */
-export type Prop = "barre" | "poignees" | "banc" | "banc_dips" | "mur" | "halteres" | "tapis" | { box: [number, number, number, number, number, number] };
+export type Prop = "barre" | "poignees" | "barres_paralleles" | "goblet" | "banc" | "banc_dips" | "mur" | "halteres" | "tapis" | { box: [number, number, number, number, number, number] };
 export interface Anim { dur: number; keys: { t: number; p: Pose }[]; props?: Prop[]; az?: number; el?: number }
 
 type SideKey = "clav" | "arm" | "fore" | "hand" | "thigh" | "shin" | "foot";
@@ -271,6 +271,74 @@ export const ANIMS: Record<MovementId, Anim> = {
         ik: feet, pole: poles("foot", [0.4, 0, 1]), effort: e,
       });
       return [{ t: 0, p: k(0.965, 0, 0, -20, 0.35) }, { t: 0.45, p: k(0.56, -0.17, 34, -112, 0.7) }, { t: 0.52, p: k(0.56, -0.17, 34, -112, 1) }, { t: 0.92, p: k(0.965, 0, 0, -20, 0.6) }];
+    })(),
+  },
+  squat_sumo: {
+    dur: 2.8, az: 30, el: 10,
+    keys: (() => {
+      const k = (y: number, z: number, a: number, e: number): Pose => ({
+        root: [0, y, z], rot: [a, 0, 0], j: { ...sym({ arm: [-32, 0, -12], fore: [-118, 0, 0], foot: [0, 38, 0] }), neck: [-a * 0.6, 0, 0] },
+        ik: both("foot", [0.29, 0.075, 0.02]), pole: poles("foot", [0.85, 0, 0.6]), effort: e,
+      });
+      return [{ t: 0, p: k(0.95, 0, 0, 0.35) }, { t: 0.45, p: k(0.6, -0.06, 14, 0.7) }, { t: 0.52, p: k(0.6, -0.06, 14, 1) }, { t: 0.92, p: k(0.95, 0, 0, 0.6) }];
+    })(),
+  },
+  squat_goblet: {
+    dur: 2.8, az: 50, el: 10, props: ["goblet"],
+    keys: (() => {
+      const k = (y: number, z: number, a: number, e: number): Pose => ({
+        root: [0, y, z], rot: [a, 0, 0], j: { ...sym({ arm: [-30 + a * 0.2, 0, -16], fore: [-128, 0, 0], foot: [0, 15, 0] }), neck: [-a * 0.6, 0, 0] },
+        ik: both("foot", [0.16, 0.075, 0.0]), pole: poles("foot", [0.45, 0, 1]), effort: e,
+      });
+      return [{ t: 0, p: k(0.965, 0, 0, 0.35) }, { t: 0.45, p: k(0.55, -0.13, 24, 0.7) }, { t: 0.52, p: k(0.55, -0.13, 24, 1) }, { t: 0.92, p: k(0.965, 0, 0, 0.6) }];
+    })(),
+  },
+  squat_bulgare: {
+    dur: 2.8, az: 85, el: 8, props: [{ box: [0, 0.21, -0.62, 0.5, 0.42, 0.34] }],
+    keys: (() => {
+      const k = (y: number, e: number): Pose => ({
+        root: [0, y, -0.07], rot: [8, 0, 0], j: { ...sym({ arm: [0, 0, 8], fore: [-12, 0, 0] }), neck: [-5, 0, 0] },
+        ik: { footL: [0.12, 0.075, 0.32], footR: [-0.12, 0.47, -0.6] }, plant: { footL: 0, footR: 172 },
+        pole: { footL: [0.15, 0, 1], footR: [-0.05, -1, 0.2] }, effort: e,
+      });
+      return [{ t: 0, p: k(0.93, 0.35) }, { t: 0.45, p: k(0.58, 0.7) }, { t: 0.52, p: k(0.58, 1) }, { t: 0.92, p: k(0.93, 0.6) }];
+    })(),
+  },
+  squat_pistol: {
+    dur: 3.2, az: 75, el: 8,
+    keys: (() => {
+      const k = (y: number, z: number, a: number, th: number, arms: number, e: number): Pose => ({
+        root: [-0.04, y, z], rot: [a, 0, 0],
+        j: { ...L("thigh", [th, 0, 4]), ...L("shin", [5, 0, 0]), ...L("foot", [20, 0, 0]), ...sym({ arm: [arms, 0, 8], fore: [-8, 0, 0] }), neck: [-a * 0.5, 0, 0] },
+        ik: { footR: [-0.1, 0.075, 0.0] }, plant: { footR: 0 }, pole: { footR: [-0.2, 0, 1] }, effort: e,
+      });
+      return [{ t: 0, p: k(0.96, 0, 4, -40, -85, 0.4) }, { t: 0.45, p: k(0.5, -0.16, 38, -118, -128, 0.75) }, { t: 0.53, p: k(0.5, -0.16, 38, -118, -128, 1) }, { t: 0.93, p: k(0.96, 0, 4, -40, -85, 0.6) }];
+    })(),
+  },
+  dips_barres: {
+    dur: 2.6, az: 75, el: 6, props: ["barres_paralleles"],
+    keys: (() => {
+      const k = (shY: number, e: number): Pose => {
+        const rot: V3 = [4, 0, 0];
+        return {
+          root: placeRoot(rot, SHOULDERS, [0, shY, -0.02]), rot, j: { ...sym({ thigh: [-8, 0, 0], shin: [75, 0, 0], foot: [30, 0, 0] }), neck: [-4, 0, 0] },
+          ik: both("hand", [0.26, 1.27, 0.02]), plant: plants("hand", "sol"), pole: poles("hand", [0.2, 0, -1]), effort: e,
+        };
+      };
+      return [{ t: 0, p: k(1.77, 0.35) }, { t: 0.42, p: k(1.5, 0.65) }, { t: 0.5, p: k(1.5, 1) }, { t: 0.86, p: k(1.77, 0.8) }];
+    })(),
+  },
+  dips_pectoraux: {
+    dur: 2.6, az: 70, el: 6, props: ["barres_paralleles"],
+    keys: (() => {
+      const k = (shY: number, shZ: number, lean: number, e: number): Pose => {
+        const rot: V3 = [lean, 0, 0];
+        return {
+          root: placeRoot(rot, SHOULDERS, [0, shY, shZ]), rot, j: { ...sym({ thigh: [-35, 0, 0], shin: [85, 0, 0], foot: [30, 0, 0] }), neck: [-12, 0, 0] },
+          ik: both("hand", [0.26, 1.27, 0.02]), plant: plants("hand", "sol"), pole: poles("hand", [0.7, 0, -0.7]), effort: e,
+        };
+      };
+      return [{ t: 0, p: k(1.76, 0.03, 16, 0.35) }, { t: 0.42, p: k(1.5, 0.1, 30, 0.65) }, { t: 0.5, p: k(1.5, 0.1, 30, 1) }, { t: 0.86, p: k(1.76, 0.03, 16, 0.8) }];
     })(),
   },
   squat_saute: {

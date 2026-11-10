@@ -1,4 +1,5 @@
 /* Actions de la séance en cours, partagées par la vue liste et le mode plein écran. */
+import type { MovementId } from "@/content/anatomy";
 import { gain } from "@/engine/core";
 import { seanceGain, setsRatio } from "@/engine/scoring";
 import type { SeancePlan } from "@/engine/types";
@@ -44,7 +45,7 @@ export function addSet(i: number) {
   });
 }
 /** Ajoute un exercice à la séance (prévue ou en cours). */
-export function addExo(e: { nom: string; type?: "reps" | "duree"; series?: number; cible?: number; charge?: string; repos?: number; consigne?: string }) {
+export function addExo(e: { nom: string; type?: "reps" | "duree"; series?: number; cible?: number; charge?: string; repos?: number; consigne?: string; mouvement?: MovementId }) {
   const nom = e.nom.trim();
   if (nom.length < 2) throw new Error("Donne un nom à l'exercice.");
   const type = e.type === "duree" ? "duree" : "reps";
@@ -52,7 +53,7 @@ export function addExo(e: { nom: string; type?: "reps" | "duree"; series?: numbe
   const cible = Math.max(1, Math.min(3600, Math.round(e.cible ?? (type === "duree" ? 30 : 10))));
   const ok = useStore.getState().act((d) => {
     const s = d.plans.seance; if (!s) return false;
-    s.exos.push({ nom: nom.slice(0, 80), type, series, cible, charge: (e.charge ?? "").slice(0, 60), repos: Math.max(0, Math.min(600, Math.round(e.repos ?? 60))), consigne: (e.consigne ?? "").slice(0, 240), alternative: "" });
+    s.exos.push({ nom: nom.slice(0, 80), type, series, cible, charge: (e.charge ?? "").slice(0, 60), repos: Math.max(0, Math.min(600, Math.round(e.repos ?? 60))), consigne: (e.consigne ?? "").slice(0, 240), alternative: "", ...(e.mouvement ? { mouvement: e.mouvement } : {}) });
     if (d.seanceStart !== null) {
       s.faits = s.faits ?? emptyFaits(s);
       if (s.faits.length < s.exos.length) s.faits.push(Array(series).fill(null));
@@ -62,6 +63,18 @@ export function addExo(e: { nom: string; type?: "reps" | "duree"; series?: numbe
   });
   if (!ok) throw new Error("Aucune séance aujourd'hui : prépare-la d'abord.");
   return `${nom} ajouté : ${series} × ${cible}${type === "duree" ? " s" : ""}.`;
+}
+/** Remplace un exercice de la séance par une variante (même dose, séries déjà faites conservées). */
+export function replaceExo(i: number, mouvement: MovementId, nom: string) {
+  const ok = useStore.getState().act((d) => {
+    const e = d.plans.seance?.exos[i]; if (!e) return false;
+    e.nom = nom.slice(0, 80); e.mouvement = mouvement; delete e.muscles;
+    // La consigne et l'alternative visaient l'ancien exercice.
+    e.consigne = ""; e.alternative = "";
+    return true;
+  });
+  if (!ok) throw new Error("Cet exercice n'est plus dans la séance.");
+  return `Remplacé par : ${nom}.`;
 }
 /** Retire un exercice dont aucune série n'est faite. */
 export function removeExo(i: number) {

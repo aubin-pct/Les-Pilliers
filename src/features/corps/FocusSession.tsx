@@ -157,7 +157,7 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
         <div className="focus-body">
           <span className="eyebrow">Exercice {ex + 1}/{plan.exos.length} · {editK !== null ? `correction de la série ${editK + 1}` : exoDone ? "terminé" : `série ${setIdx + 1}/${faits[ex].length}`}</span>
           <h2 className="focus-name">{E.nom}</h2>
-          <SeeExo exo={E} className="see-exo big" label="Voir le mouvement et les muscles" />
+          <SeeExo exo={E} index={ex} className="see-exo big" label="Voir le mouvement et les muscles" />
           <p className="focus-meta">{faits[ex].length} × {E.cible}{E.type === "duree" ? " s" : ""}{E.charge ? ` · ${E.charge}` : ""}{E.repos ? ` · repos ${E.repos} s` : ""}</p>
           {E.consigne && <p className="muted">{E.consigne}</p>}
           <div className="focus-sets">

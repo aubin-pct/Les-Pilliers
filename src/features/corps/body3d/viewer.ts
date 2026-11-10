@@ -15,7 +15,11 @@ import { bodyMats, buildBody, type BodyMats } from "./body";
 import { floorMat, makeMat, shadowMat } from "./materials";
 import { ANIMS, sampleAnim, type Anim, type Prop } from "./poses";
 
-export interface ViewerOpts { accent: string; bg: string; onPick: (id: MuscleId | null) => void; reducedMotion?: boolean }
+export interface ViewerOpts {
+  accent: string; bg: string; onPick: (id: MuscleId | null) => void; reducedMotion?: boolean;
+  /** Avancement du cycle (0–1) et effort instantané (0–1), environ dix fois par seconde. */
+  onFrame?: (phase: number, effort: number) => void;
+}
 export type View = "face" | "profil" | "dos";
 
 const BASE_MUSCLE = "#7a6f68"; // repos : neutre, pour que le rouge ne dise que l'intensité
@@ -47,6 +51,7 @@ export class BodyViewer {
   private frameCenter = new Vector3(0, 1, 0);
   private frameDist = 3.2;
   private disposed = false;
+  private lastFrameCb = 0;
 
   constructor(private canvas: HTMLCanvasElement, private opts: ViewerOpts) {
     this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
@@ -106,6 +111,8 @@ export class BodyViewer {
     this.sel = id; this.applyLook();
     if (id && focus) this.focusMuscle(id); else if (!id && focus) this.frame(false);
   }
+  /** Revient au cadrage d'origine du mouvement. */
+  recenter() { this.sel = null; this.applyLook(); this.frame(false); }
   setView(v: View) {
     const az = v === "face" ? 0 : v === "profil" ? 90 : 180;
     this.moveTo(this.frameCenter.clone(), this.orbitPos(this.frameCenter, az, 8, this.frameDist), 650);
@@ -147,6 +154,7 @@ export class BodyViewer {
     const pose = sampleAnim(this.anim, this.phase);
     applyPose(this.rig, pose);
     const effort = pose.effort ?? 0.6;
+    if (this.opts.onFrame && now - this.lastFrameCb > 100) { this.lastFrameCb = now; this.opts.onFrame(this.phase, effort); }
     for (let i = 0; i < this.strands.length; i++) {
       const s = this.strands[i], h = this.heat[s.def.id] ?? 0;
       const v = h * (0.7 + 0.3 * effort);
@@ -267,7 +275,10 @@ export class BodyViewer {
 
   private buildProps(list: Prop[]) {
     this.props.children.slice().forEach((c) => { this.props.remove(c); (c as Mesh).geometry?.dispose(); });
-    for (const k of ["halteresL", "halteresR"]) { const o = this.rig.bones.handL.getObjectByName(k) ?? this.rig.bones.handR.getObjectByName(k); o?.parent?.remove(o); }
+    // Accessoires portés par le corps (haltères dans les mains, haltère contre la poitrine) : retirés avant d'en poser d'autres.
+    const worn: Object3D[] = [];
+    this.rig.root.traverse((o) => { if (o.userData.prop) worn.push(o); });
+    worn.forEach((o) => o.parent?.remove(o));
     const metal = makeMat("metal", "#5d636b");
     const brass = makeMat("metal", "#a8873e");
     const wood = makeMat("pierre", "#4a4239");
@@ -298,11 +309,27 @@ export class BodyViewer {
         for (const x of [-0.38, 0.38]) mesh(new BoxGeometry(0.06, 0.4, 0.3), stone, [x, 0.2, -0.3]);
       } else if (p === "mur") {
         mesh(new BoxGeometry(1.6, 2.1, 0.08), stone, [0, 1.05, -0.36]);
+      } else if (p === "barres_paralleles") {
+        for (const x of [-0.26, 0.26]) {
+          mesh(new CylinderGeometry(0.02, 0.02, 1.1, 14), metal, [x, 1.25, 0.1], 0, Math.PI / 2);
+          for (const z of [-0.4, 0.6]) mesh(new CylinderGeometry(0.025, 0.03, 1.25, 10), stone, [x, 0.625, z]);
+        }
+      } else if (p === "goblet") {
+        // Un seul haltère tenu debout contre la poitrine, accroché au thorax.
+        const g = new Group(); g.userData.prop = true;
+        const r = REST.chest;
+        g.position.set(0 - r[0], 1.235 - r[1], 0.215 - r[2]);
+        g.add(new Mesh(new CylinderGeometry(0.013, 0.013, 0.17, 12), metal));
+        for (const y of [-0.075, 0.075]) {
+          const plate = new Mesh(new CylinderGeometry(0.055, 0.055, 0.035, 20), metal); plate.position.y = y; g.add(plate);
+          const rim = new Mesh(new CylinderGeometry(0.057, 0.057, 0.006, 20), brass); rim.position.y = y + Math.sign(y) * 0.018; g.add(rim);
+        }
+        this.rig.bones.chest.add(g);
       } else if (p === "tapis") {
         mesh(new BoxGeometry(0.62, 0.012, 1.8), makeMat("tissu", "#23262b"), [0, 0.006, 0]);
       } else if (p === "halteres") {
         for (const side of ["L", "R"] as const) {
-          const g = new Group(); g.name = `halteres${side}`;
+          const g = new Group(); g.name = `halteres${side}`; g.userData.prop = true;
           const hand = this.rig.bones[`hand${side}`];
           const r = REST[`hand${side}`];
           const cx = (side === "L" ? 0.238 : -0.238) - r[0];
