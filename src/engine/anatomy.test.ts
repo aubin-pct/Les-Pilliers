@@ -34,6 +34,9 @@ describe("écorché : mouvement d'un exercice", () => {
     expect(guessMovement("Abdos à la barre")).toBe("releve_genoux_suspendu");
     expect(guessMovement("Relevés de jambes suspendu")).toBe("releve_jambes_suspendu");
     expect(guessMovement("Toes to bar")).toBe("toes_to_bar");
+    expect(guessMovement("Tractions poitrine à la barre")).toBe("traction_poitrine");
+    expect(guessMovement("Tractions torse bombé")).toBe("traction_poitrine");
+    expect(guessMovement("Tractions gainées")).toBe("traction_gainee");
     expect(guessMovement("Essuie-glace")).toBe("genoux_obliques_suspendu");
     expect(guessMovement("Relevés de jambes")).toBe("releve_jambes");
   });

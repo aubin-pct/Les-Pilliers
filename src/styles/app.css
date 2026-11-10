@@ -1089,3 +1089,7 @@ button.fs { cursor: pointer; }
 .exo-row-btn:active { background: color-mix(in srgb, var(--c-corps) 10%, transparent); }
 .mv-group { display: grid; gap: 6px; }
 .mv-group + .mv-group { margin-top: 10px; }
+.anat-variants { display: grid; gap: 10px; padding: 12px; border-radius: var(--rr); border: 1px solid var(--line); background: var(--panel); }
+.anat-vgroup { display: grid; gap: 6px; }
+.anat-vtype { font-size: 12px; font-weight: 600; color: var(--stone-dark); }
+.anat-variants .chip[aria-pressed="true"] { border-color: var(--c-corps); color: var(--c-corps); background: color-mix(in srgb, var(--c-corps) 14%, transparent); }

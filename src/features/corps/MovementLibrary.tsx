@@ -22,7 +22,12 @@ export function MovementLibrary() {
         return ms.length ? (
           <div className="mv-group" key={f}>
             <span className="eyebrow">{f}</span>
-            <div className="chips">{ms.map((m) => <button key={m.id} type="button" className="chip" data-mv={m.id} onClick={() => setExo(asExo(m))}>{m.label}</button>)}</div>
+            {[...new Set(ms.map((m) => m.type ?? ""))].map((t) => (
+              <div className="anat-vgroup" key={t || "autres"}>
+                {t && <span className="anat-vtype">{t}</span>}
+                <div className="chips">{ms.filter((m) => (m.type ?? "") === t).map((m) => <button key={m.id} type="button" className="chip" data-mv={m.id} onClick={() => setExo(asExo(m))}>{m.label}</button>)}</div>
+              </div>
+            ))}
           </div>
         ) : null;
       })}

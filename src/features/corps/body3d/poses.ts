@@ -66,9 +66,9 @@ const BAR_Y = 2.27;
 /** Hauteur des épaules, bras presque tendus, mains écartées de `x` (bras de 0,52 m). */
 const hangShoulderY = (x: number) => BAR_Y - Math.sqrt(0.52 ** 2 - Math.min(0.4, Math.abs(x - 0.19)) ** 2);
 /** Suspendu à la barre : le milieu des épaules reste fixe, le corps tourne autour (bascule, rotation). */
-function hang(x: number, rot: V3, plant: Plant, pole: V3, j: Partial<Record<Joint, V3>>, effort: number, shY = hangShoulderY(x)): Pose {
+function hang(x: number, rot: V3, plant: Plant, pole: V3, j: Partial<Record<Joint, V3>>, effort: number, shY = hangShoulderY(x), shZ = -0.02): Pose {
   return {
-    root: placeRoot(rot, SHOULDERS, [0, shY, -0.02]), rot, j: { neck: [-6, 0, 0], ...j },
+    root: placeRoot(rot, SHOULDERS, [0, shY, shZ]), rot, j: { neck: [-6, 0, 0], ...j },
     ik: both("hand", [x, BAR_Y, 0.02]), plant: plants("hand", plant), pole: poles("hand", pole), effort,
   };
 }
@@ -78,6 +78,23 @@ function pullAnim(x: number, plant: Plant, pole: V3, props: Prop[] = ["barre"]):
   const lo = (e: number) => hang(x, [4, 0, 0], plant, pole, legs(0), e);
   const hi = (e: number) => hang(x, [4, 0, 0], plant, pole, legs(6), e, BAR_Y - 0.2);
   return { dur: 3, az: 150, el: 4, props, keys: [{ t: 0, p: lo(0.45) }, { t: 0.4, p: hi(1) }, { t: 0.52, p: hi(0.85) }, { t: 0.92, p: lo(0.55) }] };
+}
+/** Traction gainée : corps en « banane » (abdos serrés, jambes tendues un peu devant), menton au-dessus de la barre. */
+function pullHollow(): Anim {
+  const x = 0.3, pole: V3 = [1, -0.5, 0.1];
+  const body = (d: number): Partial<Record<Joint, V3>> => ({ ...sym({ thigh: [-20 - d, 0, 0], shin: [4, 0, 0], foot: [35, 0, 0] }), spine: [8, 0, 0], chest: [4, 0, 0] });
+  const lo = (e: number) => hang(x, [2, 0, 0], "barre", pole, body(0), e);
+  const hi = (e: number) => hang(x, [2, 0, 0], "barre", pole, body(4), e, BAR_Y - 0.21);
+  return { dur: 3, az: 90, el: 4, props: ["barre"], keys: [{ t: 0, p: lo(0.45) }, { t: 0.4, p: hi(1) }, { t: 0.52, p: hi(0.85) }, { t: 0.92, p: lo(0.55) }] };
+}
+/** Traction poitrine à la barre : on bombe le torse, le buste bascule en arrière, le sternum vient toucher la barre. */
+function pullChest(): Anim {
+  const x = 0.32, pole: V3 = [1, -0.8, -0.4];
+  const lo = (e: number) => hang(x, [2, 0, 0], "barre", [1, -0.5, 0.1], { ...sym({ thigh: [-6, 0, 0], shin: [60, 0, 0], foot: [30, 0, 0] }) }, e);
+  const hi = (e: number) => hang(x, [-17, 0, 0], "barre", pole, {
+    ...sym({ thigh: [6, 0, 0], shin: [70, 0, 0], foot: [30, 0, 0] }), spine: [-8, 0, 0], chest: [-10, 0, 0], neck: [-14, 0, 0],
+  }, e, BAR_Y - 0.08, -0.09);
+  return { dur: 3.2, az: 95, el: 4, props: ["barre"], keys: [{ t: 0, p: lo(0.45) }, { t: 0.42, p: hi(1) }, { t: 0.54, p: hi(0.9) }, { t: 0.94, p: lo(0.55) }] };
 }
 const HANG_X = 0.28;
 const HANG_POLE: V3 = [1, -0.5, 0.1];
@@ -188,6 +205,8 @@ export const ANIMS: Record<MovementId, Anim> = {
   traction_supination: pullAnim(0.19, "barreSup", [0.35, -0.6, 0.9]),
   traction_neutre: pullAnim(0.17, "barreNeutre", [0.5, -0.6, 0.7], ["poignees"]),
   traction_serree: pullAnim(0.1, "barre", [0.7, -0.6, 0.5]),
+  traction_gainee: pullHollow(),
+  traction_poitrine: pullChest(),
 
   pompe_large: pushAnim(17, 4.5, 0.42, 0.05, FLOOR_PIVOT, { pole: [1, -0.4, -0.2], handZ: PUSH_Z }),
   pompe_inclinee: pushAnim(38, 20, 0.27, 0.46, FLOOR_PIVOT, { props: [{ box: [0, 0.21, 0.62, 0.9, 0.42, 0.34] }], el: 10 }),

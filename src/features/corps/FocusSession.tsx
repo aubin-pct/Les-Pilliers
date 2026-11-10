@@ -106,7 +106,8 @@ export function FocusSession({ plan, start, onClose }: { plan: SeancePlan; start
 
   return createPortal(
     <div className="focus" role="dialog" aria-modal="true" aria-label="Séance en plein écran"
-      onPointerDown={(e) => { swipe.current = { x: e.clientX, y: e.clientY }; }}
+      // Les gestes faits dans l'écorché 3D (portail React, donc propagé jusqu'ici) ne sont pas des balayages.
+      onPointerDown={(e) => { swipe.current = (e.target as Element).closest?.(".anat") ? null : { x: e.clientX, y: e.clientY }; }}
       onPointerUp={(e) => {
         const s = swipe.current; swipe.current = null;
         if (!s || mode.k !== "set") return;

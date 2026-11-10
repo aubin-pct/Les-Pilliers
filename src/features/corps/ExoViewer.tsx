@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MOVEMENT_BY_ID, MUSCLE_BY_ID, type MuscleId } from "@/content/anatomy";
+import { MOVEMENT_BY_ID, MOVEMENTS, MUSCLE_BY_ID, type MovementId, type MuscleId } from "@/content/anatomy";
 import { exoAnatomy } from "@/engine/anatomy";
 import type { Exo } from "@/engine/types";
 import { buzz } from "@/lib/device";
@@ -28,7 +28,14 @@ export function ExoViewer({ exo, onClose }: { exo: Exo; onClose: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const viewer = useRef<BodyViewer | null>(null);
   const closeRef = useRef(onClose); closeRef.current = onClose;
-  const anat = useMemo(() => exoAnatomy(exo), [exo]);
+  const base = useMemo(() => exoAnatomy(exo), [exo]);
+  // Variante choisie dans l'écorché (autre prise, autre style) : on montre ses muscles à elle.
+  const [variant, setVariant] = useState<MovementId | null>(null);
+  const anat = useMemo(() => (variant ? exoAnatomy({ nom: MOVEMENT_BY_ID[variant].label, mouvement: variant }) : base), [variant, base]);
+  const famille = MOVEMENT_BY_ID[base.mouvement].famille;
+  const family = MOVEMENTS.filter((m) => m.famille === famille && m.id !== "debout");
+  const types = [...new Set(family.map((m) => m.type ?? ""))];
+  const pickVariant = (id: MovementId) => { setVariant(id === base.mouvement ? null : id); setSel(null); buzz(8); };
   const [status, setStatus] = useState<"load" | "ok" | "err">("load");
   const [sel, setSel] = useState<MuscleId | null>(null);
   const [playing, setPlaying] = useState(!reduced());
@@ -79,13 +86,15 @@ export function ExoViewer({ exo, onClose }: { exo: Exo; onClose: () => void }) {
   const sec = anat.muscles.filter((m) => !m.principal);
 
   return createPortal(
-    // Un portail propage ses événements à ses parents React : la séance plein écran ne doit pas prendre un glissé pour un balayage.
-    <div className="anat" role="dialog" aria-modal="true" aria-label={`${exo.nom} en 3D`} onPointerDown={stop} onPointerUp={stop} onClick={stop}>
+    // Pas de stopPropagation sur les événements de pointeur : React arrêterait aussi l'événement natif, et la caméra
+    // (OrbitControls, qui écoute la levée du doigt sur document) croirait le doigt toujours posé. La séance plein écran
+    // ignore elle-même les gestes venus de l'écorché (`.anat`).
+    <div className="anat" role="dialog" aria-modal="true" aria-label={`${exo.nom} en 3D`} onClick={stop}>
       <div className="anat-top">
         <button className="focus-x" type="button" aria-label="Fermer" onClick={onClose}>✕</button>
         <div className="anat-title">
-          <span className="eyebrow">{(() => { const M = MOVEMENT_BY_ID[anat.mouvement]; return M.label === exo.nom ? M.famille : M.label; })()}{anat.reconnu ? "" : " · mouvement approché"}</span>
-          <b>{exo.nom}</b>
+          <span className="eyebrow">{variant ? `Variante de : ${exo.nom}` : (() => { const M = MOVEMENT_BY_ID[anat.mouvement]; return M.label === exo.nom ? M.famille : M.label; })()}{!variant && !anat.reconnu ? " · mouvement approché" : ""}</span>
+          <b>{variant ? MOVEMENT_BY_ID[variant].label : exo.nom}</b>
         </div>
         {exo.series > 0 ? <span className="anat-dose num">{exo.series}×{exo.cible}{exo.type === "duree" ? "s" : ""}</span> : <span />}
       </div>
@@ -122,9 +131,27 @@ export function ExoViewer({ exo, onClose }: { exo: Exo; onClose: () => void }) {
           </div>
         ) : <p className="muted small anat-hint">Touche un muscle pour savoir lequel c'est.</p>}
 
+        {base.reconnu && family.length > 1 && (
+          <div className="anat-variants">
+            <span className="eyebrow">Toutes les variantes · {famille}</span>
+            {types.map((t) => (
+              <div className="anat-vgroup" key={t || "autres"}>
+                {t && <span className="anat-vtype">{t}</span>}
+                <div className="chips">
+                  {family.filter((m) => (m.type ?? "") === t).map((m) => (
+                    <button key={m.id} type="button" className="chip" aria-pressed={anat.mouvement === m.id} data-mv={m.id} onClick={() => pickVariant(m.id)}>
+                      {m.label}{m.id === base.mouvement && exo.series > 0 ? " · prévu" : ""}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {princ.length > 0 && <MuscleList title="Principaux" items={princ} sel={sel} onPick={(id) => setSel(sel === id ? null : id)} />}
         {sec.length > 0 && <MuscleList title="En soutien" items={sec} sel={sel} onPick={(id) => setSel(sel === id ? null : id)} />}
-        {(exo.consigne || exo.alternative) && (
+        {!variant && (exo.consigne || exo.alternative) && (
           <div className="anat-cues">
             {exo.consigne && <p><span className="eyebrow">Technique</span>{exo.consigne}</p>}
             {exo.alternative && <p><span className="eyebrow">Trop dur</span>{exo.alternative}</p>}
