@@ -12,9 +12,9 @@ import { buzz } from "@/lib/device";
 import { openLayer } from "@/lib/layers";
 import type { BodyViewer, View } from "./body3d/viewer";
 
-/** Même rampe que le shader : repos → rouge sombre → rouge vif → orange → jaune chaud. */
+/** Même rampe que le shader : repos (neutre) → vert → jaune → orange → rouge. */
 export function heatCss(h: number) {
-  const stops: [number, number[]][] = [[0, [126, 59, 52]], [0.3, [128, 26, 23]], [0.6, [204, 41, 26]], [0.85, [250, 107, 31]], [1, [255, 204, 107]]];
+  const stops: [number, number[]][] = [[0, [122, 111, 104]], [0.08, [56, 158, 77]], [0.45, [230, 204, 46]], [0.72, [247, 122, 31]], [0.95, [224, 26, 20]], [1, [224, 26, 20]]];
   let i = 0; while (i < stops.length - 2 && h > stops[i + 1][0]) i++;
   const [a, ca] = stops[i], [b, cb] = stops[i + 1];
   const u = Math.max(0, Math.min(1, (h - a) / (b - a)));
@@ -84,10 +84,10 @@ export function ExoViewer({ exo, onClose }: { exo: Exo; onClose: () => void }) {
       <div className="anat-top">
         <button className="focus-x" type="button" aria-label="Fermer" onClick={onClose}>✕</button>
         <div className="anat-title">
-          <span className="eyebrow">{MOVEMENT_BY_ID[anat.mouvement].label}{anat.reconnu ? "" : " · mouvement approché"}</span>
+          <span className="eyebrow">{(() => { const M = MOVEMENT_BY_ID[anat.mouvement]; return M.label === exo.nom ? M.famille : M.label; })()}{anat.reconnu ? "" : " · mouvement approché"}</span>
           <b>{exo.nom}</b>
         </div>
-        <span className="anat-dose num">{exo.series}×{exo.cible}{exo.type === "duree" ? "s" : ""}</span>
+        {exo.series > 0 ? <span className="anat-dose num">{exo.series}×{exo.cible}{exo.type === "duree" ? "s" : ""}</span> : <span />}
       </div>
 
       <div className="anat-stage">
@@ -104,7 +104,7 @@ export function ExoViewer({ exo, onClose }: { exo: Exo; onClose: () => void }) {
             <button key={v} type="button" aria-pressed={view === v} onClick={() => { setView(v); setSel(null); viewer.current?.setView(v); }}>{v === "face" ? "Face" : v === "profil" ? "Profil" : "Dos"}</button>
           ))}
         </div>
-        <div className="anat-legend" aria-hidden="true"><span>repos</span><i /><span>max</span></div>
+        <div className="anat-legend" aria-hidden="true"><span>léger</span><i /><span>max</span></div>
       </div>
 
       <div className="anat-panel">
@@ -153,13 +153,15 @@ function MuscleList({ title, items, sel, onPick }: { title: string; items: { id:
 }
 
 /** Bouton « voir l'exercice » : ouvre l'écorché. */
-export function SeeExo({ exo, className, label }: { exo: Exo; className?: string; label?: string }) {
+export const FigureIcon = () => <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="4.5" r="2.2" fill="currentColor" /><path d="M12 7.5v6m0 0-3.5 7m3.5-7 3.5 7M6 10.5l6-1.5 6 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" /></svg>;
+
+/** Bouton qui ouvre l'écorché. Avec `children`, tout le contenu (une ligne d'exercice) devient le bouton. */
+export function SeeExo({ exo, className, label, children }: { exo: Exo; className?: string; label?: string; children?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className={className ?? "see-exo"} aria-label={`Voir ${exo.nom} en 3D`} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="4.5" r="2.2" fill="currentColor" /><path d="M12 7.5v6m0 0-3.5 7m3.5-7 3.5 7M6 10.5l6-1.5 6 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" /></svg>
-        {label && <span>{label}</span>}
+      <button type="button" className={className ?? "see-exo"} aria-label={children ? undefined : `Voir ${exo.nom} en 3D`} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+        {children ?? <><FigureIcon />{label && <span>{label}</span>}</>}
       </button>
       {open && <ExoViewer exo={exo} onClose={() => setOpen(false)} />}
     </>

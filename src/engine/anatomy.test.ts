@@ -18,6 +18,25 @@ describe("écorché : mouvement d'un exercice", () => {
     expect(guessMovement("Posture du pigeon")).toBe("fente_basse");
     expect(guessMovement("Ouverture d’épaules au mur")).toBe("etirement_pectoraux");
   });
+  it("reconnaît les variantes de prise et les abdos à la barre", () => {
+    expect(guessMovement("Tractions")).toBe("traction");
+    expect(guessMovement("Tractions prise large")).toBe("traction_large");
+    expect(guessMovement("Tractions prises écartées")).toBe("traction_large");
+    expect(guessMovement("Tractions en supination")).toBe("traction_supination");
+    expect(guessMovement("Chin-up")).toBe("traction_supination");
+    expect(guessMovement("Tractions prise neutre")).toBe("traction_neutre");
+    expect(guessMovement("Tractions prise serrée")).toBe("traction_serree");
+    expect(guessMovement("Pompes prise serrée")).toBe("pompe_diamant");
+    expect(guessMovement("Pompes prise large")).toBe("pompe_large");
+    expect(guessMovement("Pompes pieds surélevés")).toBe("pompe_declinee");
+    expect(guessMovement("Pompes inclinées")).toBe("pompe_inclinee");
+    expect(guessMovement("Relevés de genoux suspendu")).toBe("releve_genoux_suspendu");
+    expect(guessMovement("Abdos à la barre")).toBe("releve_genoux_suspendu");
+    expect(guessMovement("Relevés de jambes suspendu")).toBe("releve_jambes_suspendu");
+    expect(guessMovement("Toes to bar")).toBe("toes_to_bar");
+    expect(guessMovement("Essuie-glace")).toBe("genoux_obliques_suspendu");
+    expect(guessMovement("Relevés de jambes")).toBe("releve_jambes");
+  });
   it("exercice inconnu : posture debout, signalé comme approché", () => {
     const a = exoAnatomy({ nom: "Truc inventé" });
     expect(a.mouvement).toBe("debout");

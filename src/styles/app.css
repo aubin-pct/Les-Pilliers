@@ -1061,7 +1061,7 @@ button.fs { cursor: pointer; }
 .anat-tools button, .anat-views button { min-width: 40px; height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(16, 18, 21, .72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: var(--fg); font-family: var(--f-mono); font-size: 12px; }
 .anat-tools button[aria-pressed="true"], .anat-views button[aria-pressed="true"] { border-color: var(--c-corps); color: var(--c-corps); }
 .anat-legend { position: absolute; right: 16px; bottom: 14px; display: flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
-.anat-legend i { width: 74px; height: 6px; border-radius: 6px; background: linear-gradient(90deg, rgb(126, 59, 52), rgb(128, 26, 23) 30%, rgb(204, 41, 26) 60%, rgb(250, 107, 31) 85%, rgb(255, 204, 107)); }
+.anat-legend i { width: 74px; height: 6px; border-radius: 6px; background: linear-gradient(90deg, rgb(56, 158, 77), rgb(230, 204, 46) 42%, rgb(247, 122, 31) 70%, rgb(224, 26, 20)); }
 .anat-panel { overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 14px; align-content: start; padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 24px); max-width: 560px; width: 100%; margin: 0 auto; border-top: 1px solid var(--line); background: linear-gradient(var(--panel), var(--bg)); }
 .anat-hint { text-align: center; margin: 0; }
 .anat-info { display: grid; gap: 8px; padding: 12px; border-radius: var(--rr); border: 1px solid color-mix(in srgb, var(--c-corps) 40%, var(--line)); background: var(--panel-2); animation: rise .25s var(--ease) both; }
@@ -1084,3 +1084,8 @@ button.fs { cursor: pointer; }
 .anat-cues p { margin: 0; display: grid; gap: 2px; }
 @media (min-width: 900px) { .anat { grid-template-rows: auto 1fr; grid-template-columns: 1fr 400px; } .anat-top { grid-column: 1 / -1; } .anat-panel { border-top: 0; border-left: 1px solid var(--line); } }
 @media (prefers-reduced-motion: reduce) { .anat, .anat-info { animation: none; } }
+.exo-row-btn { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.exo-row-btn:last-child { border-bottom: 0; }
+.exo-row-btn:active { background: color-mix(in srgb, var(--c-corps) 10%, transparent); }
+.mv-group { display: grid; gap: 6px; }
+.mv-group + .mv-group { margin-top: 10px; }

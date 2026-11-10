@@ -10,7 +10,7 @@ import { fallbackSeance } from "@/engine/fallbacks";
 import { POINTS, setsRatio } from "@/engine/scoring";
 import { HoldButton } from "@/ui/HoldButton";
 import { FocusSession } from "./FocusSession";
-import { SeeExo } from "./ExoViewer";
+import { FigureIcon, SeeExo } from "./ExoViewer";
 import { addExo, addSet, faitsOf, fillExo, finishSession, parseKg, poidsOf, removeExo, removeSet, setPoids, setSet } from "./session";
 import type { Chantier, SeancePlan } from "@/engine/types";
 import { beep, buzz, keepAwake } from "@/lib/device";
@@ -126,7 +126,7 @@ function PlanView({ plan }: { plan: SeancePlan }) {
       </div>
       <div className="exo-list">
         {plan.exos.map((e, i) => (
-          <div className="exo-row" key={i}><SeeExo exo={e} /><span className="exo-n">{e.nom}</span><span className="exo-d num">{e.series}×{e.cible}{e.type === "duree" ? "s" : ""}</span></div>
+          <SeeExo key={i} exo={e} className="exo-row exo-row-btn"><span className="see-exo" aria-hidden="true"><FigureIcon /></span><span className="exo-n">{e.nom}</span><span className="exo-d num">{e.series}×{e.cible}{e.type === "duree" ? "s" : ""}</span></SeeExo>
         ))}
       </div>
       {plan.pourquoi && <Fold title="Pourquoi cette séance"><p className="voice">{plan.pourquoi}{plan.ajustement ? `\n${plan.ajustement}` : ""}</p><p className="small muted">Échauffement : {plan.echauffement}</p></Fold>}

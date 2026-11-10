@@ -32,12 +32,13 @@ float noise(vec2 p) {
   vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
 }
+// Intensité : repos (neutre) → vert → jaune → orange → rouge.
 vec3 heat(float h) {
-  vec3 c1 = vec3(0.50, 0.10, 0.09), c2 = vec3(0.80, 0.16, 0.10), c3 = vec3(0.98, 0.42, 0.12), c4 = vec3(1.0, 0.80, 0.42);
-  if (h < 0.3) return mix(uBase, c1, smoothstep(0.0, 0.3, h));
-  if (h < 0.6) return mix(c1, c2, (h - 0.3) / 0.3);
-  if (h < 0.85) return mix(c2, c3, (h - 0.6) / 0.25);
-  return mix(c3, c4, (h - 0.85) / 0.15);
+  vec3 g = vec3(0.22, 0.62, 0.30), y = vec3(0.90, 0.80, 0.18), o = vec3(0.97, 0.48, 0.12), r = vec3(0.88, 0.10, 0.08);
+  if (h < 0.08) return mix(uBase, g, smoothstep(0.0, 0.08, h));
+  if (h < 0.45) return mix(g, y, (h - 0.08) / 0.37);
+  if (h < 0.72) return mix(y, o, (h - 0.45) / 0.27);
+  return mix(o, r, min(1.0, (h - 0.72) / 0.23));
 }
 void main() {
   vec3 N = normalize(vN); vec3 V = normalize(vV);
@@ -83,7 +84,7 @@ void main() {
   col += gloss * 0.4 * pow(max(dot(N, normalize(L2 + V)), 0.0), shin);
   float rim = pow(1.0 - max(dot(N, V), 0.0), 2.6);
   col += uRim * rim * (0.22 + 0.25 * max(dot(N, L3), 0.0));
-  if (uKind < 0.5) col += vec3(1.0, 0.45, 0.15) * uHeat * uHeat * (0.08 + 0.3 * uPulse) * (1.0 - tendon);
+  if (uKind < 0.5) col += heat(uHeat) * uHeat * uHeat * (0.06 + 0.26 * uPulse) * (1.0 - tendon);
   if (uKind > 4.5) col = uBase * (0.9 + 0.5 * uPulse) + rim * uBase;
   col += uSel * (rim * vec3(1.0, 0.86, 0.55) * 1.4 + vec3(0.07, 0.05, 0.03));
   float alpha = 1.0;

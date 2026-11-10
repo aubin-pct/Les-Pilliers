@@ -10,6 +10,7 @@ import { Fold, PillarHeader, Sparkline, Thinking, useNow } from "@/ui/kit";
 import { CoachHead } from "@/features/coach/CoachHead";
 import { TestSheet } from "./TestSheet";
 import { SessionCard } from "./SessionCard";
+import { MovementLibrary } from "./MovementLibrary";
 
 export function CorpsView() {
   const c = useChantier()!;
@@ -35,6 +36,7 @@ export function CorpsView() {
 
       <SessionCard c={c} now={now} />
       <WeekStrip />
+      <MovementLibrary />
 
       <Fold title="Tests étalons" aside={`${records}/${shown.length} records`}>
         <div className="tlist">

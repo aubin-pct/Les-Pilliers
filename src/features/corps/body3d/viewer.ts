@@ -18,7 +18,7 @@ import { ANIMS, sampleAnim, type Anim, type Prop } from "./poses";
 export interface ViewerOpts { accent: string; bg: string; onPick: (id: MuscleId | null) => void; reducedMotion?: boolean }
 export type View = "face" | "profil" | "dos";
 
-const BASE_MUSCLE = "#7e3b34";
+const BASE_MUSCLE = "#7a6f68"; // repos : neutre, pour que le rouge ne dise que l'intensité
 
 export class BodyViewer {
   private renderer: WebGLRenderer;
@@ -208,6 +208,7 @@ export class BodyViewer {
       for (const j of ["head", "handL", "handR", "footL", "footR", "hips", "chest"] as const) pts.push(this.rig.bones[j].getWorldPosition(new Vector3()));
       pts.push(worldOfRest(this.rig, "head", [0, 1.8, 0]));
     }
+    if (this.anim.props?.some((p) => p === "barre" || p === "poignees")) pts.push(new Vector3(0, 2.42, 0)); // la barre reste dans le cadre
     const min = pts.reduce((a, p) => a.min(p), pts[0].clone()), max = pts.reduce((a, p) => a.max(p), pts[0].clone());
     const c = min.clone().add(max).multiplyScalar(0.5);
     const size = max.clone().sub(min);
@@ -275,7 +276,18 @@ export class BodyViewer {
       const o = new Mesh(g, m); o.position.set(...p); o.rotation.z = rz; o.rotation.x = rx; this.props.add(o); return o;
     };
     for (const p of list) {
-      if (p === "barre") {
+      if (typeof p === "object") {
+        const [x, y, z, w, h, d] = p.box;
+        mesh(new BoxGeometry(w, h, d), stone, [x, y, z]);
+        mesh(new BoxGeometry(w, 0.025, d), wood, [x, y + h / 2 + 0.012, z]);
+      } else if (p === "poignees") {
+        mesh(new CylinderGeometry(0.02, 0.02, 1.3, 12), stone, [0, 2.44, 0.02], Math.PI / 2);
+        for (const x of [-0.17, 0.17]) {
+          mesh(new CylinderGeometry(0.016, 0.016, 0.24, 14), metal, [x, 2.3, 0.02], 0, Math.PI / 2);
+          for (const dz of [-0.12, 0.12]) mesh(new CylinderGeometry(0.012, 0.012, 0.15, 8), stone, [x, 2.37, 0.02 + dz]);
+        }
+        for (const x of [-0.65, 0.65]) mesh(new CylinderGeometry(0.03, 0.03, 0.9, 12), stone, [x, 2.85, 0.02]);
+      } else if (p === "barre") {
         mesh(new CylinderGeometry(0.016, 0.016, 1.3, 16), metal, [0, 2.3, 0.02], Math.PI / 2);
         for (const x of [-0.65, 0.65]) mesh(new CylinderGeometry(0.03, 0.03, 0.9, 12), stone, [x, 2.7, 0.02]);
       } else if (p === "banc") {

@@ -65,7 +65,7 @@ export function buildRig(): Rig {
 /* ---------------- Poses ---------------- */
 
 /** Orientation imposée à une main ou un pied posé : doigts/orteils F, normale de la paume/semelle N (monde). */
-export type Plant = "sol" | "barre" | "barreSup" | number;
+export type Plant = "sol" | "barre" | "barreSup" | "barreNeutre" | number;
 
 export interface Pose {
   /** Position du bassin (monde). */
@@ -167,6 +167,7 @@ export function applyPose(rig: Rig, pose: Pose) {
     } else if (pl === "sol") orient(end, v5.set(0, 0, 1), new Vector3(0, -1, 0), false);
     else if (pl === "barre") orient(end, v5.set(0, 1, 0), new Vector3(0, 0, 1), false);
     else if (pl === "barreSup") orient(end, v5.set(0, 1, 0), new Vector3(0, 0, -1), false);
+    else if (pl === "barreNeutre") orient(end, v5.set(0, 1, 0), new Vector3(limb === "handL" ? -1 : 1, 0, 0), false); // paumes face à face
   }
 }
 

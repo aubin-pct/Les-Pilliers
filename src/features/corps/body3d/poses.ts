@@ -6,7 +6,8 @@
 import type { MovementId } from "@/content/anatomy";
 import { blendPose, bodyPoint, mirror, mirrorX, placeRoot, type Joint, type Limb, type Plant, type Pose, type V3 } from "./rig";
 
-export type Prop = "barre" | "banc" | "banc_dips" | "mur" | "halteres" | "tapis";
+/** Accessoire nommé, ou bloc posé au sol (centre x, y, z ; largeur, hauteur, profondeur). */
+export type Prop = "barre" | "poignees" | "banc" | "banc_dips" | "mur" | "halteres" | "tapis" | { box: [number, number, number, number, number, number] };
 export interface Anim { dur: number; keys: { t: number; p: Pose }[]; props?: Prop[]; az?: number; el?: number }
 
 type SideKey = "clav" | "arm" | "fore" | "hand" | "thigh" | "shin" | "foot";
@@ -30,17 +31,56 @@ const FEET: Partial<Record<Limb, V3>> = both("foot", [0.11, 0.075, -0.02]);
 const STAND: Pose = { root: [0, 0.98, 0], j: sym({ arm: [0, 0, 5], fore: [-8, 0, 0] }), ik: FEET, effort: 0.3 };
 const breathe = (p: Pose, d = 0.008): Pose => ({ ...p, root: [p.root[0], p.root[1] + d, p.root[2]], j: { ...p.j, chest: [((p.j?.chest?.[0]) ?? 0) - 2, 0, 0] } });
 
-/* ---- Planche (bras tendus ou fléchis) : pieds fixes, mains au sol. ---- */
-function plank(angle: number, handX: number, handZ: number, extra: Partial<Pose> = {}): Pose {
+/* ---- Planche (bras tendus ou fléchis) : pieds fixes (au sol ou sur un banc), mains posées. ---- */
+const FLOOR_PIVOT: V3 = [0, 0.13, -0.86];
+function plankAt(angle: number, handX: number, handY: number, handZ: number, pivot: V3, extra: Partial<Pose> = {}): Pose {
   const rot: V3 = [90 - angle, 0, 0];
-  const root = placeRoot(rot, ANKLES, [0, 0.13, -0.86]);
+  const root = placeRoot(rot, ANKLES, pivot);
   return {
     root, rot, j: { ...sym({ foot: [-12, 0, 0] }), neck: [-8, 0, 0], ...extra.j },
-    ik: { ...both("hand", [handX, 0.05, handZ]), ...extra.ik }, plant: { ...plants("hand", "sol"), ...extra.plant },
+    ik: { ...both("hand", [handX, handY, handZ]), ...extra.ik }, plant: { ...plants("hand", "sol"), ...extra.plant },
     pole: { ...poles("hand", [0.6, -0.7, -0.4]), ...extra.pole }, effort: extra.effort,
   };
 }
-const shZ = (angle: number) => bodyPoint(placeRoot([90 - angle, 0, 0], ANKLES, [0, 0.13, -0.86]), [90 - angle, 0, 0], SHOULDERS)[2];
+const plank = (angle: number, handX: number, handZ: number, extra: Partial<Pose> = {}) => plankAt(angle, handX, 0.05, handZ, FLOOR_PIVOT, extra);
+const shZAt = (angle: number, pivot: V3) => bodyPoint(placeRoot([90 - angle, 0, 0], ANKLES, pivot), [90 - angle, 0, 0], SHOULDERS)[2];
+const shZ = (angle: number) => shZAt(angle, FLOOR_PIVOT);
+
+/** Pompe : corps de `top` à `bottom` degrés au-dessus de l'horizontale, mains en (x, y), pieds sur `pivot`. */
+function pushAnim(top: number, bottom: number, handX: number, handY: number, pivot: V3, o: { pole?: V3; props?: Prop[]; az?: number; el?: number; handZ?: number } = {}): Anim {
+  const z = o.handZ ?? shZAt(bottom, pivot) + 0.03;
+  const ex = (e: number): Partial<Pose> => ({ effort: e, ...(o.pole ? { pole: poles("hand", o.pole) } : {}) });
+  return {
+    dur: 2.6, az: o.az ?? 70, el: o.el ?? 14, props: o.props,
+    keys: [
+      { t: 0, p: plankAt(top, handX, handY, z, pivot, ex(0.35)) },
+      { t: 0.42, p: plankAt(bottom, handX, handY, z, pivot, ex(0.65)) },
+      { t: 0.5, p: plankAt(bottom, handX, handY, z, pivot, ex(1)) },
+      { t: 0.85, p: plankAt(top, handX, handY, z, pivot, ex(0.8)) },
+    ],
+  };
+}
+
+/* ---- Barre fixe : hauteur de la prise, épaules sous la barre selon l'écartement des mains. ---- */
+const BAR_Y = 2.27;
+/** Hauteur des épaules, bras presque tendus, mains écartées de `x` (bras de 0,52 m). */
+const hangShoulderY = (x: number) => BAR_Y - Math.sqrt(0.52 ** 2 - Math.min(0.4, Math.abs(x - 0.19)) ** 2);
+/** Suspendu à la barre : le milieu des épaules reste fixe, le corps tourne autour (bascule, rotation). */
+function hang(x: number, rot: V3, plant: Plant, pole: V3, j: Partial<Record<Joint, V3>>, effort: number, shY = hangShoulderY(x)): Pose {
+  return {
+    root: placeRoot(rot, SHOULDERS, [0, shY, -0.02]), rot, j: { neck: [-6, 0, 0], ...j },
+    ik: both("hand", [x, BAR_Y, 0.02]), plant: plants("hand", plant), pole: poles("hand", pole), effort,
+  };
+}
+/** Traction : de la suspension au menton au-dessus de la barre. */
+function pullAnim(x: number, plant: Plant, pole: V3, props: Prop[] = ["barre"]): Anim {
+  const legs = (d: number) => sym({ thigh: [-14 - d, 0, 0], shin: [62, 0, 0], foot: [30, 0, 0] });
+  const lo = (e: number) => hang(x, [4, 0, 0], plant, pole, legs(0), e);
+  const hi = (e: number) => hang(x, [4, 0, 0], plant, pole, legs(6), e, BAR_Y - 0.2);
+  return { dur: 3, az: 150, el: 4, props, keys: [{ t: 0, p: lo(0.45) }, { t: 0.4, p: hi(1) }, { t: 0.52, p: hi(0.85) }, { t: 0.92, p: lo(0.55) }] };
+}
+const HANG_X = 0.28;
+const HANG_POLE: V3 = [1, -0.5, 0.1];
 
 /* ---- Sur le dos ---- */
 function supine(extra: Partial<Pose> & { lift?: number } = {}): Pose {
@@ -143,14 +183,42 @@ export const ANIMS: Record<MovementId, Anim> = {
       { t: 0.52, p: { ...STAND, j: sym({ arm: [-172, -10, 6], fore: [-8, 0, 0] }), effort: 0.8 } },
     ],
   },
-  traction: {
-    dur: 3, az: 150, el: 4, props: ["barre"],
+  traction: pullAnim(0.3, "barre", [1, -0.5, 0.1]),
+  traction_large: pullAnim(0.44, "barre", [1, -0.3, -0.05]),
+  traction_supination: pullAnim(0.19, "barreSup", [0.35, -0.6, 0.9]),
+  traction_neutre: pullAnim(0.17, "barreNeutre", [0.5, -0.6, 0.7], ["poignees"]),
+  traction_serree: pullAnim(0.1, "barre", [0.7, -0.6, 0.5]),
+
+  pompe_large: pushAnim(17, 4.5, 0.42, 0.05, FLOOR_PIVOT, { pole: [1, -0.4, -0.2], handZ: PUSH_Z }),
+  pompe_inclinee: pushAnim(38, 20, 0.27, 0.46, FLOOR_PIVOT, { props: [{ box: [0, 0.21, 0.62, 0.9, 0.42, 0.34] }], el: 10 }),
+  pompe_declinee: pushAnim(2, -13, 0.27, 0.05, [0, 0.56, -0.86], { props: [{ box: [0, 0.24, -0.92, 0.5, 0.48, 0.34] }], el: 12 }),
+
+  releve_genoux_suspendu: {
+    dur: 2.6, az: 75, el: 4, props: ["barre"],
     keys: (() => {
-      const k = (y: number, e: number, legs = 0): Pose => ({
-        root: [0, y, -0.02], rot: [4, 0, 0], j: { ...sym({ thigh: [-14 - legs, 0, 0], shin: [62, 0, 0], foot: [30, 0, 0] }), neck: [-8, 0, 0] },
-        ik: both("hand", [0.3, 2.27, 0.02]), plant: plants("hand", "barre"), pole: poles("hand", [1, -0.5, 0.1]), effort: e,
-      });
-      return [{ t: 0, p: k(1.24, 0.45) }, { t: 0.4, p: k(1.63, 1, 6) }, { t: 0.52, p: k(1.63, 0.85, 6) }, { t: 0.92, p: k(1.24, 0.55) }];
+      const k = (h: number, e: number): Pose => hang(HANG_X, [4 - h * 0.12, 0, 0], "barre", HANG_POLE, { ...sym({ thigh: [-6 - h, 0, 0], shin: [12 + h * 0.95, 0, 0], foot: [30, 0, 0] }), spine: [h * 0.12, 0, 0] }, e);
+      return [{ t: 0, p: k(0, 0.45) }, { t: 0.42, p: k(100, 1) }, { t: 0.52, p: k(100, 0.85) }, { t: 0.92, p: k(0, 0.55) }];
+    })(),
+  },
+  releve_jambes_suspendu: {
+    dur: 2.8, az: 80, el: 4, props: ["barre"],
+    keys: (() => {
+      const k = (h: number, e: number): Pose => hang(HANG_X, [4 - h * 0.15, 0, 0], "barre", HANG_POLE, { ...sym({ thigh: [-4 - h, 0, 0], shin: [6, 0, 0], foot: [35, 0, 0] }), spine: [h * 0.12, 0, 0] }, e);
+      return [{ t: 0, p: k(0, 0.5) }, { t: 0.42, p: k(92, 1) }, { t: 0.52, p: k(92, 0.85) }, { t: 0.92, p: k(0, 0.6) }];
+    })(),
+  },
+  toes_to_bar: {
+    dur: 3, az: 85, el: 6, props: ["barre"],
+    keys: (() => {
+      const k = (h: number, e: number): Pose => hang(HANG_X, [4 - h * 0.28, 0, 0], "barre", [1, -0.5, -0.3], { ...sym({ thigh: [-4 - h * 1.15, 0, 0], shin: [6, 0, 0], foot: [35, 0, 0] }), spine: [h * 0.2, 0, 0], chest: [h * 0.1, 0, 0] }, e);
+      return [{ t: 0, p: k(0, 0.5) }, { t: 0.4, p: k(118, 1) }, { t: 0.5, p: k(118, 0.9) }, { t: 0.92, p: k(0, 0.6) }];
+    })(),
+  },
+  genoux_obliques_suspendu: {
+    dur: 3.4, az: 20, el: 4, props: ["barre"],
+    keys: (() => {
+      const k = (h: number, tw: number, e: number): Pose => hang(HANG_X, [4 - h * 0.1, tw, 0], "barre", HANG_POLE, { ...sym({ thigh: [-6 - h, 0, 0], shin: [12 + h * 0.95, 0, 0], foot: [30, 0, 0] }), spine: [h * 0.1, tw * 0.3, 0] }, e);
+      return [{ t: 0, p: k(0, 0, 0.5) }, { t: 0.25, p: k(90, 32, 1) }, { t: 0.5, p: k(0, 0, 0.5) }, { t: 0.75, p: k(90, -32, 1) }];
     })(),
   },
   rowing: {
