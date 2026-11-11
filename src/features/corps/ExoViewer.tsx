@@ -78,7 +78,8 @@ export function ExoViewer({ exo, index, onClose }: { exo: Exo; index?: number; o
 
   const [status, setStatus] = useState<"load" | "ok" | "err">("load");
   // Muscle choisi : le moteur principal d'emblée, pour que ses portions s'affichent sur le corps dès l'ouverture.
-  const [sel, setSel] = useState<{ id: MuscleId; part: string | null; byUser: boolean } | null>(null);
+  // `solo` : le muscle touché est isolé (seul visible) ; le retoucher, ou toucher le vide, le désisole.
+  const [sel, setSel] = useState<{ id: MuscleId; part: string | null; byUser: boolean; solo: boolean } | null>(null);
   const [tab, setTab] = useState<Tab>("muscles");
   const [playing, setPlaying] = useState(!reduced());
   const [slow, setSlow] = useState(false);
@@ -106,7 +107,14 @@ export function ExoViewer({ exo, index, onClose }: { exo: Exo; index?: number; o
           accent: css.getPropertyValue("--c-corps").trim() || "#d08a5a",
           bg: css.getPropertyValue("--bg").trim() || "#101215",
           reducedMotion: false,
-          onPick: (id, part) => { setSel(id ? { id, part: part ?? null, byUser: true } : null); if (id) setTab("muscles"); buzz(8); },
+          onPick: (id, part, fromPin) => {
+            setSel((prev) => {
+              // Étiquette d'une portion : on la fait ressortir, sans toucher à l'isolement.
+              if (fromPin && id && prev?.id === id) return { ...prev, part: prev.part === part ? null : part ?? null, byUser: true };
+              return toggleSolo(prev, id, part ?? null);
+            });
+            if (id) setTab("muscles"); buzz(8);
+          },
           onFrame: (phase, effort) => setLive({ phase, effort }),
         });
         v.setOverlay(pins.current);
@@ -123,10 +131,10 @@ export function ExoViewer({ exo, index, onClose }: { exo: Exo; index?: number; o
     if (status !== "ok") return;
     viewer.current?.setExercise(anat.mouvement, anat.muscles, anat.parts);
     const top = anat.muscles[0];
-    setSel(top ? { id: top.id, part: null, byUser: false } : null);
+    setSel(top ? { id: top.id, part: null, byUser: false, solo: false } : null);
   }, [status, anat]);
   useEffect(() => {
-    viewer.current?.select(sel?.id ?? null, sel?.byUser ?? false, sel?.part ?? null);
+    viewer.current?.select(sel?.id ?? null, sel?.byUser ?? false, sel?.part ?? null, sel?.solo ?? false);
     if (sel) requestAnimationFrame(() => strip.current?.querySelector(`[data-muscle="${sel.id}"]`)?.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" }));
   }, [sel, status]);
   useEffect(() => { strip.current?.scrollTo({ left: 0 }); }, [tab]);
@@ -134,7 +142,7 @@ export function ExoViewer({ exo, index, onClose }: { exo: Exo; index?: number; o
   useEffect(() => { viewer.current?.setSpeed(slow ? 0.4 : 1); }, [slow, status]);
   useEffect(() => { viewer.current?.setIsolate(isolate); }, [isolate, status]);
 
-  const pickMuscle = (id: MuscleId) => { setSel(sel?.id === id && sel.byUser ? null : { id, part: null, byUser: true }); buzz(6); };
+  const pickMuscle = (id: MuscleId) => { setSel((prev) => toggleSolo(prev, id, null)); buzz(6); };
   const pickVariant = (id: MovementId) => { setVariant(id === base.mouvement ? null : id); buzz(8); };
   const run = (f: () => string) => { try { toast(f()); buzz(20); } catch (e) { toast((e as Error).message); } };
   const cycleView = () => { const v = VIEWS[(VIEWS.indexOf(view ?? "dos") + 1) % 3]; setView(v); viewer.current?.setView(v); buzz(6); };
@@ -188,7 +196,7 @@ export function ExoViewer({ exo, index, onClose }: { exo: Exo; index?: number; o
 
         <div className="anat-strip" ref={strip} role="tabpanel">
           {tab === "muscles" && anat.muscles.map((m) => (
-            <button key={m.id} type="button" className="anat-chip" data-muscle={m.id} aria-pressed={sel?.id === m.id} onClick={() => pickMuscle(m.id)}>
+            <button key={m.id} type="button" className={"anat-chip" + (sel?.id === m.id && sel.solo ? " solo" : "")} data-muscle={m.id} aria-pressed={sel?.id === m.id} onClick={() => pickMuscle(m.id)}>
               <i style={{ background: heatCss(m.w) }} />{MUSCLE_BY_ID[m.id].nom}<b className="num">{Math.round(m.w * 100)}</b>
             </button>
           ))}
@@ -228,7 +236,7 @@ export function ExoViewer({ exo, index, onClose }: { exo: Exo; index?: number; o
               {selParts ? selParts.map((p) => {
                 const h = partHeat(anat, sel!.id, p.id);
                 return (
-                  <button key={p.id} type="button" className="anat-part" aria-pressed={sel!.part === p.id} onClick={() => setSel({ id: sel!.id, part: sel!.part === p.id ? null : p.id, byUser: true })}>
+                  <button key={p.id} type="button" className="anat-part" aria-pressed={sel!.part === p.id} onClick={() => setSel({ ...sel!, part: sel!.part === p.id ? null : p.id, byUser: true })}>
                     <i style={{ background: heatCss(h) }} />{p.court}<b className="num">{Math.round(h * 100)}</b>
                   </button>
                 );
@@ -251,6 +259,17 @@ export function ExoViewer({ exo, index, onClose }: { exo: Exo; index?: number; o
     </div>,
     document.body,
   );
+}
+
+type Sel = { id: MuscleId; part: string | null; byUser: boolean; solo: boolean } | null;
+/**
+ * Toucher un muscle l'isole ; retoucher le muscle isolé le désisole (il reste choisi, ses étiquettes restent) ;
+ * toucher le vide désisole, puis désélectionne.
+ */
+function toggleSolo(prev: Sel, id: MuscleId | null, part: string | null): Sel {
+  if (!id) return prev?.solo ? { ...prev, solo: false, part: null, byUser: false } : null;
+  if (prev?.id === id && prev.solo) return { ...prev, solo: false, part: null, byUser: false };
+  return { id, part, byUser: true, solo: true };
 }
 
 function Card({ t, children }: { t: string; children: React.ReactNode }) {

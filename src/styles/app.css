@@ -1077,9 +1077,9 @@ button.fs { cursor: pointer; }
 
 /* Étiquettes épinglées sur les portions du muscle choisi */
 .anat-pins { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.anat-pin { position: absolute; left: 0; top: 0; pointer-events: auto; border: 0; padding: 0; background: none; color: var(--fg); will-change: transform; }
+.anat-pin { position: absolute; left: 0; top: 0; pointer-events: none; border: 0; padding: 0; background: none; color: var(--fg); will-change: transform; }
 .anat-pin > i { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--h); box-shadow: 0 0 0 2px rgba(0, 0, 0, .55), 0 0 10px var(--h); }
-.anat-pin > span { position: absolute; top: calc(var(--dy, 0px) - 11px); left: 12px; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px; border-radius: 11px; white-space: nowrap; font-size: 11px; font-weight: 600; background: rgba(12, 13, 15, .78); border: 1px solid color-mix(in srgb, var(--h) 60%, transparent); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.anat-pin > span { pointer-events: auto; cursor: pointer; position: absolute; top: calc(var(--dy, 0px) - 11px); left: 12px; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px; border-radius: 11px; white-space: nowrap; font-size: 11px; font-weight: 600; background: rgba(12, 13, 15, .78); border: 1px solid color-mix(in srgb, var(--h) 60%, transparent); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .anat-pin > span::before { content: ""; position: absolute; right: 100%; top: 50%; width: 8px; height: 1px; background: var(--h); }
 .anat-pin.left > span { left: auto; right: 12px; }
 .anat-pin.left > span::before { right: auto; left: 100%; }
@@ -1100,6 +1100,7 @@ button.fs { cursor: pointer; }
 .anat-chip i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .anat-chip.planned { border-color: var(--brass); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brass) 40%, transparent); }
 .anat-chip b { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.anat-chip.solo { border-color: var(--c-corps); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-corps) 35%, transparent); }
 .anat-chip[aria-pressed="true"] { border-color: var(--c-corps); background: color-mix(in srgb, var(--c-corps) 18%, var(--panel-2)); }
 .anat-group { flex: none; display: flex; align-items: center; gap: 6px; }
 .anat-group + .anat-group { padding-left: 8px; border-left: 1px solid var(--line); }

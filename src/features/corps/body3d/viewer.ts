@@ -16,7 +16,8 @@ import { floorMat, makeMat, shadowMat } from "./materials";
 import { ANIMS, sampleAnim, type Anim, type Prop } from "./poses";
 
 export interface ViewerOpts {
-  accent: string; bg: string; onPick: (id: MuscleId | null, part?: string) => void; reducedMotion?: boolean;
+  /** `fromPin` : l'étiquette d'une portion a été touchée (pas le corps). */
+  accent: string; bg: string; onPick: (id: MuscleId | null, part?: string, fromPin?: boolean) => void; reducedMotion?: boolean;
   /** Avancement du cycle (0–1) et effort instantané (0–1), environ dix fois par seconde. */
   onFrame?: (phase: number, effort: number) => void;
 }
@@ -39,6 +40,8 @@ export class BodyViewer {
   private heat: Partial<Record<MuscleId, number>> = {};
   private parts: PartFocus = {};
   private selPart: string | null = null;
+  /** Muscle isolé : lui seul reste visible, tout le reste (muscles, os, plan profond) passe en verre. */
+  private solo = false;
   private overlay: HTMLElement | null = null;
   private pins: { el: HTMLElement; strands: Strand[]; q: 0 | 1 | 2 }[] = [];
   private anim: Anim = ANIMS.debout;
@@ -115,14 +118,14 @@ export class BodyViewer {
   setIsolate(b: boolean) { this.isolate = b; this.applyLook(); }
   /** Conteneur HTML (au-dessus du canvas) où s'affichent les étiquettes des portions du muscle choisi. */
   setOverlay(el: HTMLElement | null) { this.overlay = el; this.buildPins(); }
-  select(id: MuscleId | null, focus = true, part: string | null = null) {
-    const changed = id !== this.sel;
-    this.sel = id; this.selPart = part; this.applyLook(); this.buildPins();
-    if (!changed && id) return;
+  select(id: MuscleId | null, focus = true, part: string | null = null, solo = false) {
+    const changed = id !== this.sel, enteringSolo = solo && !this.solo;
+    this.sel = id; this.selPart = part; this.solo = !!id && solo; this.applyLook(); this.buildPins();
+    if (!changed && id && !enteringSolo) return;
     if (id && focus) this.focusMuscle(id); else if (!id && focus) this.frame(false);
   }
   /** Revient au cadrage d'origine du mouvement. */
-  recenter() { this.sel = null; this.selPart = null; this.applyLook(); this.buildPins(); this.frame(false); }
+  recenter() { this.sel = null; this.selPart = null; this.solo = false; this.applyLook(); this.buildPins(); this.frame(false); }
   setView(v: View) {
     const az = v === "face" ? 0 : v === "profil" ? 90 : 180;
     this.moveTo(this.frameCenter.clone(), this.orbitPos(this.frameCenter, az, 8, this.frameDist), 650);
@@ -215,7 +218,7 @@ export class BodyViewer {
       (el.querySelector("em") as HTMLElement).textContent = label;
       (el.querySelector("b") as HTMLElement).textContent = String(Math.round(h * 100));
       el.style.setProperty("--h", heatColor(h));
-      el.addEventListener("click", (e) => { e.stopPropagation(); this.opts.onPick(id, part ?? undefined); });
+      el.addEventListener("click", (e) => { e.stopPropagation(); this.opts.onPick(id, part ?? undefined, true); });
       host.appendChild(el);
       this.pins.push({ el, strands, q });
     };
@@ -259,7 +262,7 @@ export class BodyViewer {
       const id = this.strands[i].def.id;
       const mat = this.meshes[i].material as ShaderMaterial;
       const on = this.sel === id;
-      const ghost = this.isolate ? ((this.heat[id] ?? 0) > 0.05 || on ? 0 : 1) : this.sel && !on ? 0 : 0;
+      const ghost = this.solo ? (on ? 0 : 1) : this.isolate ? ((this.heat[id] ?? 0) > 0.05 || on ? 0 : 1) : 0;
       mat.uniforms.uSel.value = on ? (this.selPart ? 0.35 : 1) : 0;
       const s = this.strands[i];
       mat.uniforms.uPart.value = on && this.selPart && (s.def.part === this.selPart || s.def.grad) ? 1 : 0;
@@ -267,7 +270,7 @@ export class BodyViewer {
       mat.depthWrite = ghost < 0.5;
       this.meshes[i].renderOrder = ghost ? 5 : this.strands[i].def.deep ? 1 : 2;
     }
-    const ghostBody = this.isolate ? 1 : 0;
+    const ghostBody = this.isolate || this.solo ? 1 : 0;
     for (const m of this.bodyMeshes) {
       const mat = m.material as ShaderMaterial;
       if (mat === this.mats.oeil) continue;
@@ -349,7 +352,7 @@ export class BodyViewer {
       const ghost = (m.material as ShaderMaterial).uniforms.uGhost.value > 0.5;
       if (!ghost) { this.strands[i].geo.computeBoundingSphere(); targets.push(m); }
     });
-    const solid = this.isolate ? [] : this.bodyMeshes.filter((m) => m.material !== this.mats.oeil);
+    const solid = this.isolate || this.solo ? [] : this.bodyMeshes.filter((m) => m.material !== this.mats.oeil);
     const hit = ray.intersectObjects([...targets, ...solid], false)[0];
     const id = (hit?.object.userData.id as MuscleId | undefined) ?? null;
     let part = hit?.object.userData.part as string | undefined;
