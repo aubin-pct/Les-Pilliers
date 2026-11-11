@@ -147,3 +147,87 @@ export const MOVEMENTS: MovementDef[] = [
 
 export const MOVEMENT_BY_ID: Record<MovementId, MovementDef> = Object.fromEntries(MOVEMENTS.map((m) => [m.id, m])) as Record<MovementId, MovementDef>;
 export const isMovementId = (s: unknown): s is MovementId => typeof s === "string" && s in MOVEMENT_BY_ID;
+
+/* ---------------- Portions de muscle ---------------- */
+
+/**
+ * Portions visibles dans l'écorché (chefs, faisceaux, parties haute/basse). Chaque faisceau 3D porte l'identifiant de
+ * sa portion (`body3d/muscles.ts`). `court` s'affiche en étiquette sur le corps.
+ */
+export const PARTS: Partial<Record<MuscleId, { id: string; court: string }[]>> = {
+  pectoraux: [{ id: "haut", court: "Haut" }, { id: "milieu", court: "Milieu" }, { id: "bas", court: "Bas" }],
+  triceps: [{ id: "long", court: "Chef long" }, { id: "lateral", court: "Chef latéral" }],
+  avant_bras: [{ id: "flech", court: "Fléchisseurs" }, { id: "ext", court: "Extenseurs" }, { id: "brachiorad", court: "Brachio-radial" }],
+  trapezes: [{ id: "sup", court: "Supérieur" }, { id: "moyen", court: "Moyen" }, { id: "inf", court: "Inférieur" }],
+  coiffe: [{ id: "infra", court: "Infra-épineux" }, { id: "rond", court: "Grand rond" }],
+  grand_dorsal: [{ id: "haut", court: "Haut" }, { id: "milieu", court: "Milieu" }, { id: "bas", court: "Bas" }],
+  abdos: [{ id: "bas", court: "Bas" }, { id: "haut", court: "Haut" }],
+  fessiers: [{ id: "bas", court: "Bas" }, { id: "haut", court: "Haut" }],
+  flechisseurs_hanche: [{ id: "psoas", court: "Psoas" }, { id: "couturier", court: "Couturier" }, { id: "tfl", court: "Tenseur" }],
+  quadriceps: [{ id: "droit", court: "Droit fémoral" }, { id: "vlat", court: "Vaste latéral" }, { id: "vmed", court: "Vaste médial" }],
+  ischios: [{ id: "biceps", court: "Biceps fémoral" }, { id: "semi", court: "Semi-tendineux" }],
+  adducteurs: [{ id: "long", court: "Long" }, { id: "grand", court: "Grand" }],
+  mollets: [{ id: "jmed", court: "Jumeau int." }, { id: "jlat", court: "Jumeau ext." }, { id: "sol", court: "Soléaire" }],
+};
+
+/** Part de chaque portion dans le mouvement (1 = autant que le muscle entier ; absent = 1). */
+export type PartFocus = Partial<Record<MuscleId, Record<string, number>>>;
+
+const P = {
+  pecHaut: { pectoraux: { haut: 1, milieu: 0.8, bas: 0.5 } },
+  pecBas: { pectoraux: { haut: 0.5, milieu: 0.85, bas: 1 } },
+  absBas: (haut = 0.6) => ({ abdos: { bas: 1, haut } }),
+  quadSquat: { quadriceps: { vlat: 1, vmed: 0.95, droit: 0.7 }, fessiers: { bas: 1, haut: 0.65 }, adducteurs: { grand: 1, long: 0.7 } },
+};
+
+export const PART_FOCUS: Partial<Record<MovementId, PartFocus>> = {
+  pompe_inclinee: P.pecBas,
+  pompe_declinee: P.pecHaut,
+  pompe_piquee: { pectoraux: { haut: 1, milieu: 0.5, bas: 0.3 } },
+  pompe_large: { pectoraux: { haut: 0.8, milieu: 1, bas: 0.85 } },
+  pompe_diamant: { pectoraux: { haut: 0.8, milieu: 1, bas: 0.7 }, triceps: { lateral: 1, long: 0.85 } },
+  dips: { triceps: { lateral: 1, long: 0.85 }, pectoraux: { haut: 0.4, milieu: 0.7, bas: 1 } },
+  dips_barres: { triceps: { lateral: 1, long: 1 }, pectoraux: { haut: 0.4, milieu: 0.7, bas: 1 } },
+  dips_pectoraux: P.pecBas,
+  developpe_couche: { pectoraux: { haut: 0.85, milieu: 1, bas: 0.85 } },
+  developpe_epaules: { trapezes: { sup: 1, moyen: 0.5, inf: 0.5 } },
+  elevation_laterale: { trapezes: { sup: 1, moyen: 0.4, inf: 0.3 } },
+  extension_triceps: { triceps: { long: 1, lateral: 0.75 } },
+  curl: { avant_bras: { flech: 1, brachiorad: 0.7, ext: 0.4 } },
+  traction: { grand_dorsal: { haut: 0.9, milieu: 1, bas: 0.85 }, trapezes: { sup: 0.4, moyen: 0.7, inf: 0.85 } },
+  traction_large: { grand_dorsal: { haut: 1, milieu: 0.95, bas: 0.7 }, trapezes: { sup: 0.4, moyen: 0.75, inf: 0.8 } },
+  traction_supination: { grand_dorsal: { haut: 0.65, milieu: 0.9, bas: 1 }, avant_bras: { flech: 1, brachiorad: 0.6, ext: 0.4 } },
+  traction_neutre: { avant_bras: { brachiorad: 1, flech: 0.8, ext: 0.5 }, grand_dorsal: { haut: 0.8, milieu: 1, bas: 0.9 } },
+  traction_serree: { grand_dorsal: { haut: 0.7, milieu: 0.9, bas: 1 } },
+  traction_gainee: { grand_dorsal: { haut: 0.9, milieu: 1, bas: 0.9 }, abdos: { haut: 1, bas: 0.8 } },
+  traction_poitrine: { trapezes: { sup: 0.4, moyen: 1, inf: 1 }, grand_dorsal: { haut: 0.75, milieu: 0.9, bas: 1 } },
+  rowing: { trapezes: { sup: 0.5, moyen: 1, inf: 0.8 }, grand_dorsal: { haut: 0.7, milieu: 0.9, bas: 1 } },
+  souleve_de_terre: { ischios: { semi: 1, biceps: 0.9 }, fessiers: { bas: 1, haut: 0.7 }, trapezes: { sup: 1, moyen: 0.6, inf: 0.4 } },
+  squat: P.quadSquat,
+  squat_goblet: P.quadSquat,
+  squat_sumo: { adducteurs: { long: 1, grand: 1 }, quadriceps: { vmed: 1, vlat: 0.8, droit: 0.6 }, fessiers: { bas: 1, haut: 0.7 } },
+  squat_saute: { quadriceps: { vlat: 1, vmed: 1, droit: 0.8 }, mollets: { jmed: 1, jlat: 1, sol: 0.7 } },
+  squat_pistol: { quadriceps: { vmed: 1, vlat: 0.9, droit: 0.75 }, fessiers: { bas: 1, haut: 0.85 } },
+  squat_bulgare: { quadriceps: { vmed: 1, vlat: 0.95, droit: 0.7 }, fessiers: { bas: 1, haut: 0.75 } },
+  fente: { quadriceps: { vmed: 1, vlat: 0.95, droit: 0.8 }, fessiers: { bas: 1, haut: 0.7 } },
+  chaise_murale: { quadriceps: { vlat: 1, vmed: 1, droit: 0.7 } },
+  mollets: { mollets: { jmed: 1, jlat: 1, sol: 0.8 } },
+  pont_fessier: { fessiers: { bas: 1, haut: 0.85 }, ischios: { biceps: 0.9, semi: 0.8 } },
+  crunch: { abdos: { haut: 1, bas: 0.55 } },
+  releve_jambes: { ...P.absBas(0.55), flechisseurs_hanche: { psoas: 1, couturier: 0.5, tfl: 0.5 } },
+  releve_genoux_suspendu: { ...P.absBas(0.6), flechisseurs_hanche: { psoas: 1, couturier: 0.5, tfl: 0.6 } },
+  releve_jambes_suspendu: { ...P.absBas(0.7), flechisseurs_hanche: { psoas: 1, couturier: 0.7, tfl: 0.7 } },
+  toes_to_bar: { ...P.absBas(0.85), flechisseurs_hanche: { psoas: 1, couturier: 0.7, tfl: 0.7 } },
+  genoux_obliques_suspendu: P.absBas(0.6),
+  hollow: { abdos: { haut: 0.9, bas: 1 } },
+  rotation_tronc: { abdos: { haut: 0.9, bas: 0.7 } },
+  mountain_climber: { ...P.absBas(0.7), flechisseurs_hanche: { psoas: 1, couturier: 0.6, tfl: 0.7 } },
+  superman: { trapezes: { sup: 0.4, moyen: 0.8, inf: 1 }, fessiers: { bas: 1, haut: 0.7 } },
+  course: { flechisseurs_hanche: { psoas: 1, couturier: 0.6, tfl: 0.7 }, mollets: { jmed: 1, jlat: 1, sol: 0.9 } },
+  etirement_ischios: { ischios: { semi: 1, biceps: 0.9 }, mollets: { jmed: 1, jlat: 1, sol: 0.6 } },
+  etirement_quadriceps: { quadriceps: { droit: 1, vlat: 0.5, vmed: 0.5 }, flechisseurs_hanche: { psoas: 1, couturier: 0.5, tfl: 0.6 } },
+  fente_basse: { flechisseurs_hanche: { psoas: 1, couturier: 0.6, tfl: 0.7 }, quadriceps: { droit: 0.9, vlat: 0.3, vmed: 0.3 } },
+  chien_tete_en_bas: { mollets: { jmed: 1, jlat: 1, sol: 0.6 } },
+  etirement_pectoraux: { pectoraux: { haut: 0.8, milieu: 1, bas: 0.9 } },
+  jumping_jack: { trapezes: { sup: 0.8, moyen: 0.4, inf: 0.3 } },
+};

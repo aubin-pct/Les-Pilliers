@@ -3,7 +3,7 @@
  * L'IA donne `mouvement` et `muscles` ; sinon (séance de secours, exercice ajouté à la main, ancienne séance),
  * on les déduit du nom.
  */
-import { MOVEMENT_BY_ID, MOVEMENTS, isMovementId, isMuscleId, type Activation, type MovementId, type MuscleId } from "@/content/anatomy";
+import { MOVEMENT_BY_ID, MOVEMENTS, PART_FOCUS, isMovementId, isMuscleId, type Activation, type MovementId, type MuscleId, type PartFocus } from "@/content/anatomy";
 import type { Exo } from "./types";
 
 export interface ExoAnatomy {
@@ -12,7 +12,13 @@ export interface ExoAnatomy {
   muscles: { id: MuscleId; w: number; principal: boolean }[];
   /** Le mouvement vient-il d'un nom reconnu ou de l'IA (true), ou d'un repli générique (false) ? */
   reconnu: boolean;
+  /** Part de chaque portion de muscle (haut/bas du pectoral, chefs du triceps…), 1 si non précisé. */
+  parts: PartFocus;
 }
+
+/** Intensité d'une portion : celle du muscle modulée par le mouvement, plafonnée à 1. */
+export const partHeat = (a: Pick<ExoAnatomy, "muscles" | "parts">, id: MuscleId, part: string) =>
+  Math.min(1, (a.muscles.find((m) => m.id === id)?.w ?? 0) * (a.parts[id]?.[part] ?? 1));
 
 export const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[’`]/g, "'").replace(/\s+/g, " ").trim();
 
@@ -45,5 +51,5 @@ export function exoAnatomy(e: Pick<Exo, "nom"> & Partial<Pick<Exo, "mouvement" |
     .filter(([, w]) => w > 0.05)
     .map(([m, w]) => ({ id: m, w: Math.round(Math.max(0, Math.min(1, w)) * 100) / 100, principal: w >= 0.7 }))
     .sort((a, b) => b.w - a.w);
-  return { mouvement: id, muscles, reconnu };
+  return { mouvement: id, muscles, reconnu, parts: PART_FOCUS[id] ?? {} };
 }

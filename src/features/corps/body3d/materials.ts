@@ -23,7 +23,7 @@ void main() {
 
 const frag = /* glsl */ `
 uniform vec3 uBase; uniform vec3 uRim;
-uniform float uKind; uniform float uHeat; uniform float uPulse; uniform float uSel; uniform float uGhost;
+uniform float uKind; uniform float uHeat; uniform float uHeatB; uniform float uPart; uniform float uPulse; uniform float uSel; uniform float uGhost;
 uniform float uFibers; uniform vec2 uTend; uniform float uSeg; uniform float uSeed;
 varying vec3 vN; varying vec3 vV; varying vec2 vUv;
 
@@ -46,7 +46,9 @@ void main() {
   float t = vUv.x, a = vUv.y;
   vec3 alb = uBase; float tendon = 0.0; float gloss = 0.12; float shin = 24.0;
   if (uKind < 0.5) {
-    alb = heat(uHeat);
+    // Deux portions sur un même faisceau (grand droit) : l'intensité passe de l'une à l'autre le long du muscle.
+    float hh = mix(uHeat, uHeatB, smoothstep(0.38, 0.62, t));
+    alb = heat(hh);
     float ts = 1.0 - smoothstep(uTend.x * 0.7, uTend.x * 1.2 + 0.001, t);
     float te = smoothstep(1.0 - uTend.y * 1.2 - 0.001, 1.0 - uTend.y * 0.7, t);
     tendon = max(ts, te);
@@ -84,7 +86,9 @@ void main() {
   col += gloss * 0.4 * pow(max(dot(N, normalize(L2 + V)), 0.0), shin);
   float rim = pow(1.0 - max(dot(N, V), 0.0), 2.6);
   col += uRim * rim * (0.22 + 0.25 * max(dot(N, L3), 0.0));
-  if (uKind < 0.5) col += heat(uHeat) * uHeat * uHeat * (0.06 + 0.26 * uPulse) * (1.0 - tendon);
+  if (uKind < 0.5) { float hh2 = mix(uHeat, uHeatB, smoothstep(0.38, 0.62, t)); col += heat(hh2) * hh2 * hh2 * (0.06 + 0.26 * uPulse) * (1.0 - tendon); }
+  // Portion désignée : liseré lumineux qui la détache du reste du muscle.
+  if (uPart > 0.0) col += uPart * (rim * vec3(1.0, 0.95, 0.8) * 1.6 + vec3(0.06));
   if (uKind > 4.5) col = uBase * (0.9 + 0.5 * uPulse) + rim * uBase;
   col += uSel * (rim * vec3(1.0, 0.86, 0.55) * 1.4 + vec3(0.07, 0.05, 0.03));
   float alpha = 1.0;
@@ -102,7 +106,7 @@ export function makeMat(kind: Kind, base: string, opts: { fibers?: number; tend?
     ...(kind === "muscle" ? { side: DoubleSide } : {}),
     uniforms: {
       uBase: { value: new Color(base) }, uRim: { value: new Color(opts.rim ?? "#d08a5a") },
-      uKind: { value: KIND[kind] }, uHeat: { value: 0 }, uPulse: { value: 0 }, uSel: { value: 0 }, uGhost: { value: 0 },
+      uKind: { value: KIND[kind] }, uHeat: { value: 0 }, uHeatB: { value: 0 }, uPart: { value: 0 }, uPulse: { value: 0 }, uSel: { value: 0 }, uGhost: { value: 0 },
       uFibers: { value: opts.fibers ?? 9 }, uTend: { value: opts.tend ?? [0.08, 0.12] }, uSeg: { value: opts.seg ?? 0 }, uSeed: { value: opts.seed ?? 0 },
     },
   });

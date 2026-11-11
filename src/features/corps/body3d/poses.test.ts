@@ -1,13 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { Vector3 } from "three";
-import { MOVEMENTS } from "@/content/anatomy";
+import { MOVEMENTS, PARTS, PART_FOCUS } from "@/content/anatomy";
 import { ANIMS, sampleAnim } from "./poses";
 import { applyPose, buildRig, type Limb } from "./rig";
-import { buildStrands, updateStrand } from "./muscles";
+import { buildStrands, STRANDS, updateStrand } from "./muscles";
 
 describe("écorché : animations", () => {
   const rig = buildRig();
   const strands = buildStrands();
+
+  it("chaque portion du catalogue a son faisceau, et inversement", () => {
+    for (const [id, parts] of Object.entries(PARTS)) for (const p of parts!) {
+      expect(STRANDS.some((s) => s.id === id && (s.part === p.id || s.grad?.includes(p.id))), `${id}.${p.id}`).toBe(true);
+    }
+    for (const s of STRANDS) for (const p of [s.part, ...(s.grad ?? [])].filter(Boolean)) {
+      expect(PARTS[s.id]?.some((q) => q.id === p), `${s.id}.${p}`).toBe(true);
+    }
+    for (const [mv, focus] of Object.entries(PART_FOCUS)) for (const [id, parts] of Object.entries(focus!)) for (const p of Object.keys(parts)) {
+      expect(PARTS[id as keyof typeof PARTS]?.some((q) => q.id === p), `${mv} → ${id}.${p}`).toBe(true);
+    }
+  });
 
   it("chaque mouvement du catalogue a son animation", () => {
     for (const m of MOVEMENTS) expect(ANIMS[m.id], m.id).toBeDefined();

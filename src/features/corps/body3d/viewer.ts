@@ -8,7 +8,7 @@ import {
   Vector2, Vector3, WebGLRenderer, LinearSRGBColorSpace, type Object3D, type ShaderMaterial,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { MUSCLE_BY_ID, type MovementId, type MuscleId } from "@/content/anatomy";
+import { MUSCLE_BY_ID, PARTS, type MovementId, type MuscleId, type PartFocus } from "@/content/anatomy";
 import { applyPose, buildRig, worldOfRest, REST, type Rig } from "./rig";
 import { buildStrands, updateStrand, type Strand } from "./muscles";
 import { bodyMats, buildBody, type BodyMats } from "./body";
@@ -16,7 +16,7 @@ import { floorMat, makeMat, shadowMat } from "./materials";
 import { ANIMS, sampleAnim, type Anim, type Prop } from "./poses";
 
 export interface ViewerOpts {
-  accent: string; bg: string; onPick: (id: MuscleId | null) => void; reducedMotion?: boolean;
+  accent: string; bg: string; onPick: (id: MuscleId | null, part?: string) => void; reducedMotion?: boolean;
   /** Avancement du cycle (0–1) et effort instantané (0–1), environ dix fois par seconde. */
   onFrame?: (phase: number, effort: number) => void;
 }
@@ -37,6 +37,10 @@ export class BodyViewer {
   private props = new Group();
   private shadow: Mesh;
   private heat: Partial<Record<MuscleId, number>> = {};
+  private parts: PartFocus = {};
+  private selPart: string | null = null;
+  private overlay: HTMLElement | null = null;
+  private pins: { el: HTMLElement; strands: Strand[]; q: 0 | 1 | 2 }[] = [];
   private anim: Anim = ANIMS.debout;
   private phase = 0;
   private last = 0;
@@ -65,7 +69,7 @@ export class BodyViewer {
     this.strands = buildStrands();
     this.strands.forEach((s, i) => {
       const m = new Mesh(s.geo, makeMat("muscle", BASE_MUSCLE, { tend: s.def.tend ?? [0.08, 0.12], seg: s.def.seg ?? 0, rim: opts.accent, seed: i * 1.7, fibers: Math.round(8 + s.def.w * 140) }));
-      m.userData.id = s.def.id;
+      m.userData.id = s.def.id; m.userData.part = s.def.part; m.userData.grad = s.def.grad;
       m.frustumCulled = false;
       m.renderOrder = s.def.deep ? 1 : 2;
       this.meshes.push(m);
@@ -97,9 +101,11 @@ export class BodyViewer {
 
   /* ---------------- API ---------------- */
 
-  setExercise(mouvement: MovementId, muscles: { id: MuscleId; w: number }[]) {
+  setExercise(mouvement: MovementId, muscles: { id: MuscleId; w: number }[], parts: PartFocus = {}) {
     this.anim = ANIMS[mouvement] ?? ANIMS.debout;
     this.heat = Object.fromEntries(muscles.map((m) => [m.id, m.w]));
+    this.parts = parts;
+    this.buildPins();
     this.phase = 0;
     this.buildProps(this.anim.props ?? []);
     this.frame(true);
@@ -107,12 +113,16 @@ export class BodyViewer {
   setPlaying(p: boolean) { this.playing = p; }
   setSpeed(s: number) { this.speed = s; }
   setIsolate(b: boolean) { this.isolate = b; this.applyLook(); }
-  select(id: MuscleId | null, focus = true) {
-    this.sel = id; this.applyLook();
+  /** Conteneur HTML (au-dessus du canvas) où s'affichent les étiquettes des portions du muscle choisi. */
+  setOverlay(el: HTMLElement | null) { this.overlay = el; this.buildPins(); }
+  select(id: MuscleId | null, focus = true, part: string | null = null) {
+    const changed = id !== this.sel;
+    this.sel = id; this.selPart = part; this.applyLook(); this.buildPins();
+    if (!changed && id) return;
     if (id && focus) this.focusMuscle(id); else if (!id && focus) this.frame(false);
   }
   /** Revient au cadrage d'origine du mouvement. */
-  recenter() { this.sel = null; this.applyLook(); this.frame(false); }
+  recenter() { this.sel = null; this.selPart = null; this.applyLook(); this.buildPins(); this.frame(false); }
   setView(v: View) {
     const az = v === "face" ? 0 : v === "profil" ? 90 : 180;
     this.moveTo(this.frameCenter.clone(), this.orbitPos(this.frameCenter, az, 8, this.frameDist), 650);
@@ -120,6 +130,7 @@ export class BodyViewer {
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
+    this.pins.forEach((p) => p.el.remove()); this.pins = [];
     this.ro.disconnect();
     document.removeEventListener("visibilitychange", this.onVis);
     this.canvas.removeEventListener("pointerdown", this.onDown);
@@ -155,13 +166,15 @@ export class BodyViewer {
     applyPose(this.rig, pose);
     const effort = pose.effort ?? 0.6;
     if (this.opts.onFrame && now - this.lastFrameCb > 100) { this.lastFrameCb = now; this.opts.onFrame(this.phase, effort); }
+    const k = 0.7 + 0.3 * effort;
     for (let i = 0; i < this.strands.length; i++) {
-      const s = this.strands[i], h = this.heat[s.def.id] ?? 0;
-      const v = h * (0.7 + 0.3 * effort);
-      updateStrand(s, this.rig, v * effort);
+      const s = this.strands[i];
+      const [a, b] = this.strandHeat(s);
+      updateStrand(s, this.rig, Math.max(a, b) * k * effort);
       const u = (this.meshes[i].material as ShaderMaterial).uniforms;
-      u.uHeat.value = v; u.uPulse.value = effort;
+      u.uHeat.value = a * k; u.uHeatB.value = b * k; u.uPulse.value = effort;
     }
+    this.placePins();
     this.mats.oeil.uniforms.uPulse.value = 0.4 + 0.6 * effort;
     this.placeShadow();
     if (this.tween) {
@@ -174,13 +187,82 @@ export class BodyViewer {
     this.renderer.render(this.scene, this.camera);
   };
 
+  /** Intensité d'une portion (muscle × part de la portion dans le mouvement). */
+  private partHeat(id: MuscleId, part?: string) {
+    const w = this.heat[id] ?? 0;
+    return Math.min(1, part ? w * (this.parts[id]?.[part] ?? 1) : w);
+  }
+  /** Intensité à l'origine et à l'insertion du faisceau (différentes seulement pour le grand droit). */
+  private strandHeat(s: Strand): [number, number] {
+    if (s.def.grad) return [this.partHeat(s.def.id, s.def.grad[0]), this.partHeat(s.def.id, s.def.grad[1])];
+    const h = this.partHeat(s.def.id, s.def.part);
+    return [h, h];
+  }
+
+  /** Étiquettes posées sur le corps : une par portion du muscle choisi (ou une seule s'il n'a pas de portions). */
+  private buildPins() {
+    this.pins.forEach((p) => p.el.remove());
+    this.pins = [];
+    const id = this.sel, host = this.overlay;
+    if (!id || !host) return;
+    const own = this.strands.filter((s) => s.def.id === id);
+    const parts = PARTS[id];
+    const make = (label: string, h: number, strands: Strand[], q: 0 | 1 | 2, part: string | null) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "anat-pin" + (part && part === this.selPart ? " on" : "");
+      el.innerHTML = `<i></i><span><em></em><b></b></span>`;
+      (el.querySelector("em") as HTMLElement).textContent = label;
+      (el.querySelector("b") as HTMLElement).textContent = String(Math.round(h * 100));
+      el.style.setProperty("--h", heatColor(h));
+      el.addEventListener("click", (e) => { e.stopPropagation(); this.opts.onPick(id, part ?? undefined); });
+      host.appendChild(el);
+      this.pins.push({ el, strands, q });
+    };
+    if (!parts) { make(MUSCLE_BY_ID[id].nom, this.partHeat(id), own, 1, null); return; }
+    for (const p of parts) {
+      const grad = own.filter((s) => s.def.grad);
+      if (grad.length) make(p.court, this.partHeat(id, p.id), grad, grad[0].def.grad![0] === p.id ? 0 : 2, p.id);
+      else make(p.court, this.partHeat(id, p.id), own.filter((s) => s.def.part === p.id), 1, p.id);
+    }
+  }
+  private placePins() {
+    if (!this.pins.length || !this.overlay) return;
+    const w = this.overlay.clientWidth, h = this.overlay.clientHeight;
+    const cam = this.camera.position, v = new Vector3();
+    const pts = this.pins.map((p) => {
+      // Le faisceau du côté de la caméra (le gauche ou le droit) porte l'étiquette.
+      let best: Vector3 | null = null, bd = Infinity;
+      for (const s of p.strands) { const d = s.q[p.q].distanceTo(cam); if (d < bd) { bd = d; best = s.q[p.q]; } }
+      if (!best) return null;
+      v.copy(best).project(this.camera);
+      return v.z > 1 ? null : { x: (v.x + 1) / 2 * w, y: (1 - v.y) / 2 * h };
+    });
+    const visible = pts.filter(Boolean) as { x: number; y: number }[];
+    const cx = visible.reduce((a, p) => a + p.x, 0) / Math.max(1, visible.length);
+    // Étiquettes empilées sans se chevaucher : on les écarte verticalement de 24 px au moins.
+    const order = this.pins.map((_, i) => i).filter((i) => pts[i]).sort((a, b) => pts[a]!.y - pts[b]!.y);
+    let lastY = -Infinity;
+    for (const i of order) {
+      const p = pts[i]!, ly = Math.max(p.y, lastY + 24); lastY = ly;
+      const el = this.pins[i].el;
+      el.style.display = "";
+      el.classList.toggle("left", p.x < cx || (visible.length === 1 && p.x > w * 0.6));
+      el.style.setProperty("--dy", `${ly - p.y}px`);
+      el.style.transform = `translate(${p.x}px, ${p.y}px)`;
+    }
+    this.pins.forEach((p, i) => { if (!pts[i]) p.el.style.display = "none"; });
+  }
+
   private applyLook() {
     for (let i = 0; i < this.meshes.length; i++) {
       const id = this.strands[i].def.id;
       const mat = this.meshes[i].material as ShaderMaterial;
       const on = this.sel === id;
       const ghost = this.isolate ? ((this.heat[id] ?? 0) > 0.05 || on ? 0 : 1) : this.sel && !on ? 0 : 0;
-      mat.uniforms.uSel.value = on ? 1 : 0;
+      mat.uniforms.uSel.value = on ? (this.selPart ? 0.35 : 1) : 0;
+      const s = this.strands[i];
+      mat.uniforms.uPart.value = on && this.selPart && (s.def.part === this.selPart || s.def.grad) ? 1 : 0;
       mat.uniforms.uGhost.value = ghost;
       mat.depthWrite = ghost < 0.5;
       this.meshes[i].renderOrder = ghost ? 5 : this.strands[i].def.deep ? 1 : 2;
@@ -270,7 +352,10 @@ export class BodyViewer {
     const solid = this.isolate ? [] : this.bodyMeshes.filter((m) => m.material !== this.mats.oeil);
     const hit = ray.intersectObjects([...targets, ...solid], false)[0];
     const id = (hit?.object.userData.id as MuscleId | undefined) ?? null;
-    this.opts.onPick(id);
+    let part = hit?.object.userData.part as string | undefined;
+    const grad = hit?.object.userData.grad as [string, string] | undefined;
+    if (grad && hit?.uv) part = hit.uv.x < 0.5 ? grad[0] : grad[1];
+    this.opts.onPick(id, part);
   };
 
   private buildProps(list: Prop[]) {
@@ -344,6 +429,14 @@ export class BodyViewer {
       }
     }
   }
+}
+
+/** Même rampe que le shader (pour les étiquettes HTML). */
+function heatColor(h: number) {
+  const st: [number, number[]][] = [[0, [122, 111, 104]], [0.08, [56, 158, 77]], [0.45, [230, 204, 46]], [0.72, [247, 122, 31]], [0.95, [224, 26, 20]], [1, [224, 26, 20]]];
+  let i = 0; while (i < st.length - 2 && h > st[i + 1][0]) i++;
+  const [a, ca] = st[i], [b, cb] = st[i + 1], u = Math.max(0, Math.min(1, (h - a) / (b - a)));
+  return `rgb(${ca.map((c, k) => Math.round(c + (cb[k] - c) * u)).join(",")})`;
 }
 
 export const hasWebGL = () => {
